@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useApp, formatMoney } from "@/lib/store";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Download, ArrowLeft, Check, Clock, Package, Bell } from "lucide-react";
+import { Download, ArrowLeft, Check, Clock, Package, Bell, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 export default function OrderDetail() {
@@ -54,7 +54,7 @@ export default function OrderDetail() {
     }
   };
 
-  const steps: { label: string; icon: any; done: boolean }[] = [
+  const steps: { label: string; icon: LucideIcon; done: boolean }[] = [
     { label: "Dibuat", icon: Check, done: true },
     { label: "Diproses", icon: Package, done: ["Preparing", "Ready", "Completed"].includes(order.status) },
     { label: "Siap", icon: Bell, done: ["Ready", "Completed"].includes(order.status) },

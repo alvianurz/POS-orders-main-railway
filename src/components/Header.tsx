@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ShoppingCart, Bell, LogOut, LayoutDashboard, Store, Receipt, HelpCircle, Settings2 } from "lucide-react";
+import { ShoppingCart, Bell, LogOut, LayoutDashboard, Store, Receipt, HelpCircle, Settings2, type LucideIcon } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { authApi } from "@/lib/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,14 @@ export default function Header() {
   const unread = notifications.filter((n) => !n.read).length;
   const { pathname } = useLocation();
   const isAdmin = user?.role === "admin";
+
+  const handleSignOut = async () => {
+    try {
+      await authApi.signOut();
+    } finally {
+      signOut();
+    }
+  };
 
   useEffect(() => {
     const iconHref = appIcon || "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a1a1a'/%3E%3Cpath d='M20 28h24l-3 16H23z' fill='white'/%3E%3Cpath d='M24 20h16l2 8H22z' fill='white' opacity='.85'/%3E%3C/svg%3E";
@@ -140,7 +149,7 @@ export default function Header() {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut}>
+                <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" /> Keluar
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -176,7 +185,7 @@ export default function Header() {
   );
 }
 
-function NavTab({ to, label, icon: Icon, compact = false }: { to: string; label: string; icon: any; compact?: boolean }) {
+function NavTab({ to, label, icon: Icon, compact = false }: { to: string; label: string; icon: LucideIcon; compact?: boolean }) {
   return (
     <NavLink
       to={to}

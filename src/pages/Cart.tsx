@@ -5,6 +5,7 @@ import { useApp, formatMoney } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
+import { hasProductImage } from "@/lib/product-image";
 
 export default function Cart() {
   const { cart, products, updateCartQty, removeFromCart, placeOrder, user, isStoreOpen } = useApp();
@@ -45,7 +46,9 @@ export default function Cart() {
             <div className="space-y-3">
               {lines.map((l) => (
                 <div key={l.productId} className="surface-card border border-border/60 rounded-2xl p-3 flex gap-4 items-center">
-                  <img src={l.product.image} alt={l.product.name} className="h-20 w-20 rounded-xl object-cover" loading="lazy" width={80} height={80} />
+                  {hasProductImage(l.product) && (
+                    <img src={l.product.image} alt={l.product.name} className="h-20 w-20 rounded-xl object-cover" loading="lazy" width={80} height={80} />
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="font-display font-semibold">{l.product.name}</div>
                     <div className="text-sm text-muted-foreground font-mono">{formatMoney(l.product.price)}</div>

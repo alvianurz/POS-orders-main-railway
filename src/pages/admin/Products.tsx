@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, AlertTriangle, Minus, Tag, X, FileUp, FileDown, Download } from "lucide-react";
 import type { Category, Product } from "@/lib/types";
+import { hasProductImage } from "@/lib/product-image";
 import { toast } from "sonner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -43,7 +44,7 @@ export default function AdminProducts() {
   const save = () => {
     if (!editing) return;
     if (!editing.name || editing.price <= 0) return toast.error("Nama dan harga wajib diisi");
-    upsertProduct({ ...editing, image: editing.image || "/placeholder.svg" });
+    upsertProduct({ ...editing, image: editing.image.trim() });
     toast.success("Produk tersimpan");
     setOpen(false);
   };
@@ -151,7 +152,7 @@ export default function AdminProducts() {
           price,
           stock,
           description: record.description || "",
-          image: record.image || "/placeholder.svg",
+          image: record.image || "",
         };
 
         upsertProduct(nextProduct);
@@ -224,7 +225,9 @@ export default function AdminProducts() {
             ) : filteredProducts.map((p) => (
               <div key={p.id} className="p-4 space-y-3">
                 <div className="flex items-start gap-3">
-                  <img src={p.image} alt="" className="h-14 w-14 rounded-lg object-cover shrink-0" loading="lazy" width={56} height={56} />
+                  {hasProductImage(p) && (
+                    <img src={p.image} alt="" className="h-14 w-14 rounded-lg object-cover shrink-0" loading="lazy" width={56} height={56} />
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold leading-snug">{p.name}</div>
                     <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{p.description}</div>
@@ -283,7 +286,9 @@ export default function AdminProducts() {
                   <tr key={p.id} className="border-t border-border/60">
                     <td className="p-3">
                       <div className="flex items-center gap-3">
-                        <img src={p.image} alt="" className="h-10 w-10 rounded-lg object-cover" loading="lazy" width={40} height={40} />
+                        {hasProductImage(p) && (
+                          <img src={p.image} alt="" className="h-10 w-10 rounded-lg object-cover" loading="lazy" width={40} height={40} />
+                        )}
                         <div>
                           <div className="font-semibold">{p.name}</div>
                           <div className="text-xs text-muted-foreground line-clamp-1">{p.description}</div>

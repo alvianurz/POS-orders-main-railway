@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import { useApp, formatMoney } from "@/lib/store";
+import { hasProductImage } from "@/lib/product-image";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -13,6 +14,7 @@ import {
   ShoppingBag,
   TrendingUp,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Area,
@@ -315,7 +317,9 @@ export default function AdminDashboard() {
               <div className="space-y-2">
                 {stats.lowStock.slice(0, 6).map((p) => (
                   <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg bg-secondary/40">
-                    <img src={p.image} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" loading="lazy" width={40} height={40} />
+                    {hasProductImage(p) && (
+                      <img src={p.image} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" loading="lazy" width={40} height={40} />
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold truncate text-sm">{p.name}</div>
                       <div className="text-xs text-muted-foreground truncate">{p.category}</div>
@@ -360,7 +364,7 @@ export default function AdminDashboard() {
   );
 }
 
-function Stat({ label, value, helper, icon: Icon, accent }: { label: string; value: string; helper: string; icon: any; accent?: boolean }) {
+function Stat({ label, value, helper, icon: Icon, accent }: { label: string; value: string; helper: string; icon: LucideIcon; accent?: boolean }) {
   return (
     <div className={`surface-card border border-border/60 rounded-2xl p-4 sm:p-5 ${accent ? "ring-1 ring-primary/40" : ""}`}>
       <div className="flex items-center justify-between text-muted-foreground gap-2">

@@ -7,6 +7,7 @@ import { Search, Sparkles } from "lucide-react";
 import type { Category } from "@/lib/types";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { hasProductImage } from "@/lib/product-image";
 
 export default function Shop() {
   const { products, user, categories: storeCats, isStoreOpen } = useApp();
@@ -62,7 +63,7 @@ export default function Shop() {
               )}
             </div>
             <div className="hidden md:grid grid-cols-2 gap-4 animate-slide-up">
-              {products.slice(0, 4).map((p) => (
+              {products.filter(hasProductImage).slice(0, 4).map((p) => (
                 <div key={p.id} className="surface-card rounded-2xl overflow-hidden border border-border/60 aspect-square">
                   <img src={p.image} alt={p.name} className="h-full w-full object-cover" loading="lazy" width={512} height={512} />
                 </div>

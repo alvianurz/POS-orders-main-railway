@@ -35,7 +35,7 @@ interface AppState {
   notifications: { id: string; message: string; orderId?: string; read: boolean; ts: number }[];
 
   // auth
-  signIn: (u: User) => void;
+  setUser: (u: User | null) => void;
   signOut: () => void;
 
   // cart
@@ -87,7 +87,7 @@ export const useApp = create<AppState>()(
       isStoreOpen: true,
       notifications: [],
 
-      signIn: (u) => set({ user: u }),
+      setUser: (u) => set({ user: u }),
       signOut: () => set({ user: null, cart: [] }),
 
       addToCart: (productId, qty = 1) => {
@@ -219,9 +219,19 @@ export const useApp = create<AppState>()(
     }),
     {
       name: "quickpick-pos",
+      partialize: (state) => ({
+        products: state.products,
+        categories: state.categories,
+        cart: state.cart,
+        orders: state.orders,
+        storeName: state.storeName,
+        appIcon: state.appIcon,
+        isStoreOpen: state.isStoreOpen,
+        notifications: state.notifications,
+      }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppState>;
-        const merged = { ...current, ...p } as AppState;
+        const merged = { ...current, ...p, user: null } as AppState;
         if (!merged.categories || merged.categories.length === 0) {
           const fromProducts = Array.from(new Set((merged.products ?? []).map((x) => x.category)));
           merged.categories = fromProducts.length ? fromProducts : seedCategories;

@@ -7,29 +7,38 @@ import { Label } from "@/components/ui/label";
 import { useApp } from "@/lib/store";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
+import { authApi } from "@/lib/api";
 
 export default function Auth() {
   const nav = useNavigate();
-  const signIn = useApp((s) => s.signIn);
+  const setUser = useApp((s) => s.setUser);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.email || !form.password) return toast.error("Email dan kata sandi wajib diisi");
     if (mode === "signup" && (!form.name || !form.phone))
       return toast.error("Lengkapi semua data terlebih dahulu");
+    if (form.password.length < 8) return toast.error("Kata sandi minimal 8 karakter");
 
-    const isAdmin = form.email.toLowerCase() === "admin@quickpick.com";
-    signIn({
-      name: form.name || form.email.split("@")[0],
-      email: form.email,
-      phone: form.phone || "—",
-      role: isAdmin ? "admin" : "customer",
-    });
-    toast.success(isAdmin ? "Selamat datang kembali, admin" : "Berhasil masuk");
-    nav(isAdmin ? "/admin" : "/");
+    try {
+      setLoading(true);
+      const data =
+        mode === "signup"
+          ? await authApi.register(form)
+          : await authApi.signIn(form.email, form.password);
+      if (!data.user) throw new Error("Sesi tidak ditemukan.");
+      setUser(data.user);
+      toast.success(data.user.role === "admin" ? "Selamat datang kembali, admin" : "Berhasil masuk");
+      nav(data.user.role === "admin" ? "/admin" : "/");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal masuk");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -56,17 +65,17 @@ export default function Auth() {
               <>
                 <div className="space-y-1.5">
                   <Label>Nama lengkap</Label>
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nama pelanggan" />
+                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nama pelanggan" disabled={loading} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Nomor telepon</Label>
-                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+62 812 3456 7890" />
+                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+62 812 3456 7890" disabled={loading} />
                 </div>
               </>
             )}
             <div className="space-y-1.5">
               <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nama@email.com" />
+              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nama@email.com" disabled={loading} />
             </div>
             <div className="space-y-1.5">
               <Label>Kata sandi</Label>
@@ -77,6 +86,7 @@ export default function Auth() {
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="Masukkan kata sandi"
                   className="pr-11"
+                  disabled={loading}
                 />
                 <button
                   type="button"
@@ -89,8 +99,8 @@ export default function Auth() {
               </div>
             </div>
 
-            <Button type="submit" size="lg" className="w-full font-bold">
-              {mode === "signin" ? "Masuk" : "Buat akun"}
+            <Button type="submit" size="lg" className="w-full font-bold" disabled={loading}>
+              {loading ? "Memproses..." : mode === "signin" ? "Masuk" : "Buat akun"}
             </Button>
           </form>
 
@@ -104,9 +114,11 @@ export default function Auth() {
             </button>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-border/60 text-xs text-muted-foreground text-center font-mono">
-            Tips: gunakan <span className="text-primary">admin@quickpick.com</span> untuk masuk sebagai admin
-          </div>
+          {mode === "signup" && (
+            <div className="mt-6 pt-6 border-t border-border/60 text-xs text-muted-foreground text-center">
+              Akun baru otomatis menjadi pelanggan. Akun admin dibuat dari server.
+            </div>
+          )}
         </div>
       </main>
     </div>
