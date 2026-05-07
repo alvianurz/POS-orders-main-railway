@@ -73,7 +73,7 @@ export default function Shop() {
         </section>
 
         {/* Shop */}
-        <section id="shop" className="container py-10 space-y-6">
+        <section id="shop" className="container py-10 pb-[calc(5rem+env(safe-area-inset-bottom))] space-y-6">
           {!isStoreOpen && (
             <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
               Toko sedang tutup. Produk masih dapat dilihat, tetapi pemesanan dinonaktifkan.

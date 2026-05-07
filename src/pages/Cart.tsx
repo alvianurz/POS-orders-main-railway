@@ -32,7 +32,7 @@ export default function Cart() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 container py-6 sm:py-10 space-y-6">
+      <main className="flex-1 container py-6 sm:py-10 pb-[calc(5rem+env(safe-area-inset-bottom))] space-y-6">
         <PageHeader title="Keranjang" backTo="/" />
 
         {lines.length === 0 ? (
@@ -45,27 +45,42 @@ export default function Cart() {
           <div className="grid lg:grid-cols-[1fr_360px] gap-6">
             <div className="space-y-3">
               {lines.map((l) => (
-                <div key={l.productId} className="surface-card border border-border/60 rounded-2xl p-3 flex gap-4 items-center">
-                  {hasProductImage(l.product) && (
-                    <img src={l.product.image} alt={l.product.name} className="h-20 w-20 rounded-xl object-cover" loading="lazy" width={80} height={80} />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-display font-semibold">{l.product.name}</div>
-                    <div className="text-sm text-muted-foreground font-mono">{formatMoney(l.product.price)}</div>
+                <div key={l.productId} className="surface-card border border-border/60 rounded-2xl p-3 sm:p-4">
+                  <div className="flex gap-3 sm:items-center">
+                    {hasProductImage(l.product) && (
+                      <img
+                        src={l.product.image}
+                        alt={l.product.name}
+                        className="h-20 w-20 shrink-0 rounded-xl object-cover"
+                        loading="lazy"
+                        width={80}
+                        height={80}
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-display font-semibold leading-tight break-words">{l.product.name}</div>
+                          <div className="text-sm text-muted-foreground font-mono">{formatMoney(l.product.price)}</div>
+                        </div>
+                        <Button size="icon" variant="ghost" className="shrink-0 -mr-2 -mt-1" onClick={() => removeFromCart(l.productId)}>
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3 sm:mt-2 sm:justify-start sm:gap-4">
+                        <div className="flex items-center gap-1 bg-secondary rounded-full p-0.5">
+                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateCartQty(l.productId, l.quantity - 1)}>
+                            <Minus className="h-3.5 w-3.5" />
+                          </Button>
+                          <span className="w-7 text-center text-sm font-bold font-mono">{l.quantity}</span>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" disabled={l.quantity >= l.product.stock} onClick={() => updateCartQty(l.productId, l.quantity + 1)}>
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <div className="font-mono font-bold text-right sm:ml-auto">{formatMoney(l.product.price * l.quantity)}</div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 bg-secondary rounded-full p-0.5">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateCartQty(l.productId, l.quantity - 1)}>
-                      <Minus className="h-3.5 w-3.5" />
-                    </Button>
-                    <span className="text-sm font-bold font-mono w-6 text-center">{l.quantity}</span>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" disabled={l.quantity >= l.product.stock} onClick={() => updateCartQty(l.productId, l.quantity + 1)}>
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <div className="font-mono font-bold w-24 text-right">{formatMoney(l.product.price * l.quantity)}</div>
-                  <Button size="icon" variant="ghost" onClick={() => removeFromCart(l.productId)}>
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
-                  </Button>
                 </div>
               ))}
             </div>

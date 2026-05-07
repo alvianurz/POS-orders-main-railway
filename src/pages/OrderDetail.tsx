@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toPng } from "html-to-image";
 import Header from "@/components/Header";
@@ -64,23 +64,23 @@ export default function OrderDetail() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 container py-10 max-w-3xl">
+      <main className="flex-1 container py-10 pb-[calc(5rem+env(safe-area-inset-bottom))] max-w-3xl">
         <Link to="/orders" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
           <ArrowLeft className="h-4 w-4" /> Kembali ke pesanan
         </Link>
 
-        <div className="surface-card border border-border/60 rounded-3xl p-6 md:p-8 space-y-8">
+        <div className="surface-card border border-border/60 rounded-3xl p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="text-xs uppercase tracking-wider text-muted-foreground font-mono">ID ambil</div>
-              <div className="text-4xl font-display font-bold tracking-wider mt-1">{order.pickupId}</div>
+              <div className="text-3xl sm:text-4xl font-display font-bold tracking-wider mt-1 break-words">{order.pickupId}</div>
               <div className="text-sm text-muted-foreground mt-1">Tunjukkan kode ini saat mengambil pesanan</div>
             </div>
             <StatusBadge status={order.status} />
           </div>
 
           {/* Progress */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-2">
             {steps.map((s, i) => (
               <div key={i} className="flex flex-col items-center gap-2 text-center">
                 <div className={`h-10 w-10 rounded-full grid place-items-center transition-colors ${s.done ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
@@ -92,31 +92,34 @@ export default function OrderDetail() {
           </div>
 
           {/* Receipt block (used for image download) */}
-          <div ref={ref} className="bg-white text-zinc-900 rounded-2xl p-4 font-mono text-sm w-[320px] min-w-[320px] max-w-[320px] mx-auto box-border overflow-hidden">
+          <div
+            ref={ref}
+            className="bg-white text-zinc-900 rounded-2xl px-3 py-4 sm:p-4 font-mono text-[13px] leading-5 w-full max-w-[320px] sm:min-w-[320px] sm:w-[320px] mx-auto box-border overflow-hidden"
+          >
             <div className="text-center border-b border-dashed border-zinc-300 pb-4 mb-4">
-              <div className="font-bold text-lg leading-tight break-words" style={{ fontFamily: "Space Grotesk, sans-serif" }}>{storeName}</div>
+              <div className="font-bold text-lg leading-tight break-words px-2" style={{ fontFamily: "Space Grotesk, sans-serif" }}>{storeName}</div>
               <div className="text-xs text-zinc-500">Struk pesanan</div>
             </div>
-            <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs mb-4">
-              <span className="text-zinc-500">ID ambil</span><span className="text-right font-bold break-words">{order.pickupId}</span>
-              <span className="text-zinc-500">Tanggal pesan</span><span className="text-right break-words">{orderDate.toLocaleDateString("id-ID")}</span>
-              <span className="text-zinc-500">Jam pesan</span><span className="text-right break-words">{orderDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
-              <span className="text-zinc-500">Pelanggan</span><span className="text-right break-words">{order.customerName}</span>
-              <span className="text-zinc-500">Telepon</span><span className="text-right break-words">{order.customerPhone}</span>
+            <div className="space-y-2 mb-4 text-xs sm:text-sm">
+              <Row label="ID ambil" value={<span className="font-bold break-words">{order.pickupId}</span>} />
+              <Row label="Tanggal pesan" value={orderDate.toLocaleDateString("id-ID")} />
+              <Row label="Jam pesan" value={orderDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} />
+              <Row label="Pelanggan" value={order.customerName} />
+              <Row label="Telepon" value={order.customerPhone} />
             </div>
             <div className="border-t border-dashed border-zinc-300 pt-3 space-y-1.5">
               {order.items.map((i) => (
-                <div key={i.productId} className="grid grid-cols-[1fr_auto] gap-3 items-start">
-                  <span className="min-w-0 break-words">{i.quantity}× {i.name}</span>
-                  <span className="shrink-0">{formatMoney(i.price * i.quantity)}</span>
+                <div key={i.productId} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-start text-[13px] sm:text-sm">
+                  <span className="min-w-0 break-words leading-5">{i.quantity}× {i.name}</span>
+                  <span className="shrink-0 whitespace-nowrap leading-5">{formatMoney(i.price * i.quantity)}</span>
                 </div>
               ))}
             </div>
-            <div className="border-t border-dashed border-zinc-300 mt-3 pt-3 flex justify-between font-bold text-base">
+            <div className="border-t border-dashed border-zinc-300 mt-3 pt-3 flex justify-between font-bold text-base sm:text-lg">
               <span>Total</span>
               <span>{formatMoney(order.total)}</span>
             </div>
-            <div className="text-center text-xs text-zinc-500 mt-4 pt-3 border-t border-dashed border-zinc-300 break-words">
+            <div className="text-center text-xs text-zinc-500 mt-4 pt-3 border-t border-dashed border-zinc-300 break-words px-2">
               Bayar di toko saat pesanan diambil. Terima kasih.
             </div>
           </div>
@@ -133,6 +136,15 @@ export default function OrderDetail() {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="shrink-0 text-zinc-500">{label}</span>
+      <span className="min-w-0 text-right break-words">{value}</span>
     </div>
   );
 }

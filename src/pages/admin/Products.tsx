@@ -181,24 +181,26 @@ export default function AdminProducts() {
           subtitle={`${filteredProducts.length} dari ${products.length} produk · ${products.filter((p) => p.stock <= 5).length} stok rendah · ${categories.length} kategori`}
           backTo="/admin"
           actions={
-            <>
-              <Button variant="secondary" onClick={() => setCatOpen(true)} className="font-bold">
-                <Tag className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Kategori</span>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:items-center">
+                <Button variant="secondary" onClick={() => setCatOpen(true)} className="w-full font-bold justify-start sm:w-auto sm:justify-center">
+                  <Tag className="h-4 w-4 shrink-0 sm:mr-1" />
+                  <span>Kategori</span>
+                </Button>
+                <Button variant="secondary" onClick={() => exportCsv("products")} className="w-full font-bold justify-start sm:w-auto sm:justify-center">
+                  <FileDown className="h-4 w-4 shrink-0 sm:mr-1" />
+                  <span>Ekspor CSV</span>
+                </Button>
+                <Button variant="secondary" onClick={() => setImportOpen(true)} className="w-full font-bold justify-start sm:w-auto sm:justify-center">
+                  <FileUp className="h-4 w-4 shrink-0 sm:mr-1" />
+                  <span>Impor CSV</span>
+                </Button>
+              </div>
+              <Button onClick={startNew} className="w-full font-bold justify-start sm:w-auto sm:justify-center">
+                <Plus className="h-4 w-4 shrink-0 sm:mr-1" />
+                <span>Produk baru</span>
               </Button>
-              <Button variant="secondary" onClick={() => exportCsv("products")} className="font-bold">
-                <FileDown className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Ekspor CSV</span>
-              </Button>
-              <Button variant="secondary" onClick={() => setImportOpen(true)} className="font-bold">
-                <FileUp className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Impor CSV</span>
-              </Button>
-              <Button onClick={startNew} className="font-bold">
-                <Plus className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Produk baru</span>
-              </Button>
-            </>
+            </div>
           }
         />
         <div className="surface-card border border-border/60 rounded-2xl p-4 sm:p-5">

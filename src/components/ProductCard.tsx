@@ -36,13 +36,13 @@ export default function ProductCard({ product }: { product: Product }) {
               Sisa {product.stock}
             </span>
           )}
-          <span className="absolute top-3 right-3 px-2 py-1 rounded-full bg-background/70 backdrop-blur text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          <span className="absolute top-2 right-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-background/70 px-2 py-1 text-[9px] font-mono uppercase leading-none tracking-[0.12em] backdrop-blur text-muted-foreground sm:top-3 sm:right-3 sm:text-[10px] sm:tracking-wider">
             {product.category}
           </span>
         </div>
       ) : (
         <div className="flex items-center justify-between gap-2 border-b border-border/60 bg-secondary/25 px-3 py-2">
-          <span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          <span className="max-w-[70%] truncate rounded-full bg-secondary px-2 py-1 text-[9px] font-mono uppercase leading-none tracking-[0.12em] text-muted-foreground sm:text-[10px] sm:tracking-wider">
             {product.category}
           </span>
           <div className="flex items-center gap-1">
@@ -64,10 +64,12 @@ export default function ProductCard({ product }: { product: Product }) {
           <h3 className={`font-display font-semibold leading-tight ${hasImage ? "text-base" : "text-sm"}`}>{product.name}</h3>
           <p className={`${hasImage ? "line-clamp-1" : "line-clamp-2"} text-xs text-muted-foreground mt-0.5`}>{product.description}</p>
         </div>
-        <div className={`flex ${hasImage ? "items-center" : "items-end"} justify-between gap-2`}>
-          <div className={`font-mono font-bold ${hasImage ? "text-lg" : "text-base"}`}>{formatMoney(product.price)}</div>
+        <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${hasImage ? "" : "items-start"}`}>
+          <div className={`w-full max-w-full break-words font-mono font-bold leading-none tracking-tight text-sm sm:text-base ${hasImage ? "md:text-lg" : "md:text-base"}`}>
+            {formatMoney(product.price)}
+          </div>
           {inCart ? (
-            <div className="flex items-center gap-1 bg-secondary rounded-full p-0.5">
+            <div className="flex w-full items-center justify-between gap-1 rounded-full bg-secondary p-0.5 sm:w-auto sm:justify-start">
               <Button
                 size="icon"
                 variant="ghost"
@@ -92,7 +94,7 @@ export default function ProductCard({ product }: { product: Product }) {
               size="sm"
               disabled={out || !isStoreOpen}
               onClick={() => addToCart(product.id)}
-              className="rounded-full font-semibold px-3 sm:px-4"
+              className="w-full rounded-full font-semibold px-3 sm:w-auto sm:px-4"
               aria-label={`Tambah ${product.name} ke keranjang`}
             >
               <Plus className="h-4 w-4 sm:mr-1" />
