@@ -13,6 +13,7 @@ export default function OrderDetail() {
   const order = useApp((s) => s.orders.find((o) => o.id === id));
   const storeName = useApp((s) => s.storeName);
   const ref = useRef<HTMLDivElement>(null);
+  const orderDate = new Date(order?.createdAt ?? Date.now());
 
   if (!order) {
     return (
@@ -98,7 +99,8 @@ export default function OrderDetail() {
             </div>
             <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs mb-4">
               <span className="text-zinc-500">ID ambil</span><span className="text-right font-bold break-words">{order.pickupId}</span>
-              <span className="text-zinc-500">Tanggal</span><span className="text-right break-words">{new Date(order.createdAt).toLocaleString("id-ID")}</span>
+              <span className="text-zinc-500">Tanggal pesan</span><span className="text-right break-words">{orderDate.toLocaleDateString("id-ID")}</span>
+              <span className="text-zinc-500">Jam pesan</span><span className="text-right break-words">{orderDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
               <span className="text-zinc-500">Pelanggan</span><span className="text-right break-words">{order.customerName}</span>
               <span className="text-zinc-500">Telepon</span><span className="text-right break-words">{order.customerPhone}</span>
             </div>
