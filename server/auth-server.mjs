@@ -11,9 +11,28 @@ const dbPath = join(dataDir, "auth.json");
 const distDir = join(rootDir, "dist");
 const sessions = new Map();
 
+const seedProducts = [
+  { id: "p1", name: "Croissant Mentega", price: 35000, category: "Roti", image: "/assets/p-croissant-D5hPY4CY.jpg", stock: 24, description: "Renyah, wangi mentega, dipanggang setiap hari." },
+  { id: "p2", name: "Cold Brew 330ml", price: 45000, category: "Minuman", image: "/assets/p-coldbrew-Dmwifmlz.jpg", stock: 18, description: "Cold brew halus dengan ekstraksi 18 jam." },
+  { id: "p3", name: "Roti Sourdough", price: 70000, category: "Roti", image: "/assets/p-sourdough-yfwc6Pdw.jpg", stock: 9, description: "Fermentasi 24 jam dengan ragi alami." },
+  { id: "p4", name: "Cokelat Hitam 70%", price: 50000, category: "Camilan", image: "/assets/p-chocolate-DbD5nk3D.jpg", stock: 42, description: "Cokelat single-origin dengan 70% kakao." },
+  { id: "p5", name: "Pisang Organik", price: 22000, category: "Sayur & Buah", image: "/assets/p-bananas-bAz_1TLB.jpg", stock: 60, description: "Matang, segar, dan siap disantap." },
+  { id: "p6", name: "Susu Segar 1L", price: 32000, category: "Kebutuhan Dapur", image: "/assets/p-milk-ui6udx6n.jpg", stock: 3, description: "Susu lokal segar dalam botol kaca." },
+  { id: "p7", name: "Muffin Blueberry", price: 38000, category: "Roti", image: "/assets/p-muffin-MqRtP67U.jpg", stock: 14, description: "Muffin lembut dengan blueberry melimpah." },
+  { id: "p8", name: "Biji Kopi Sangrai 250g", price: 140000, category: "Kebutuhan Dapur", image: "/assets/p-beans-CDQZ7pJu.jpg", stock: 11, description: "Sangrai medium dengan aroma kakao." },
+];
+const seedCategories = ["Roti", "Minuman", "Camilan", "Kebutuhan Dapur", "Sayur & Buah"];
+
 const jsonHeaders = { "content-type": "application/json; charset=utf-8" };
 
 const publicUser = ({ id, name, email, phone, role }) => ({ id, name, email, phone, role });
+const publicCatalog = (db) => ({
+  products: db.products ?? [],
+  categories: db.categories ?? [],
+  storeName: db.storeName ?? "QuickPick POS",
+  appIcon: db.appIcon ?? null,
+  isStoreOpen: typeof db.isStoreOpen === "boolean" ? db.isStoreOpen : true,
+});
 
 const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 
@@ -34,7 +53,14 @@ const verifyPassword = (password, stored) => {
 const loadDb = async () => {
   await mkdir(dataDir, { recursive: true });
   if (!existsSync(dbPath)) {
-    const initial = { users: [] };
+    const initial = {
+      users: [],
+      products: [],
+      categories: [],
+      storeName: "QuickPick POS",
+      appIcon: null,
+      isStoreOpen: true,
+    };
     const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
     const adminPassword = process.env.ADMIN_PASSWORD;
     if (adminEmail && adminPassword) {
@@ -66,6 +92,11 @@ const loadDb = async () => {
     });
     await saveDb(db);
   }
+  if (!Array.isArray(db.products)) db.products = [];
+  if (!Array.isArray(db.categories) || db.categories.length === 0) db.categories = [];
+  if (typeof db.storeName !== "string" || !db.storeName) db.storeName = "QuickPick POS";
+  if (typeof db.appIcon === "undefined") db.appIcon = null;
+  if (typeof db.isStoreOpen !== "boolean") db.isStoreOpen = true;
   return db;
 };
 
@@ -129,6 +160,42 @@ const handleApi = async (req, res) => {
     if (req.method === "GET" && req.url === "/api/auth/session") {
       const user = await currentUser(req);
       return sendJson(res, 200, { user });
+    }
+
+    if (req.method === "GET" && req.url === "/api/catalog") {
+      const db = await loadDb();
+      return sendJson(res, 200, publicCatalog(db));
+    }
+
+    if (req.method === "POST" && req.url === "/api/catalog/bootstrap") {
+      const body = await readBody(req);
+      const db = await loadDb();
+      if ((db.products ?? []).length > 0) {
+        return sendJson(res, 200, publicCatalog(db));
+      }
+      db.products = Array.isArray(body.products) ? body.products : seedProducts;
+      db.categories = Array.isArray(body.categories) && body.categories.length ? body.categories : seedCategories;
+      db.storeName = typeof body.storeName === "string" && body.storeName.trim() ? body.storeName.trim() : "QuickPick POS";
+      db.appIcon = typeof body.appIcon === "string" ? body.appIcon : null;
+      db.isStoreOpen = typeof body.isStoreOpen === "boolean" ? body.isStoreOpen : true;
+      await saveDb(db);
+      return sendJson(res, 201, publicCatalog(db));
+    }
+
+    if (req.method === "PUT" && req.url === "/api/catalog") {
+      const me = await currentUser(req);
+      if (!me || me.role !== "admin") {
+        return sendJson(res, 401, { message: "Hanya admin yang dapat mengubah katalog." });
+      }
+      const body = await readBody(req);
+      const db = await loadDb();
+      db.products = Array.isArray(body.products) ? body.products : db.products;
+      db.categories = Array.isArray(body.categories) ? body.categories : db.categories;
+      db.storeName = typeof body.storeName === "string" && body.storeName.trim() ? body.storeName.trim() : db.storeName;
+      db.appIcon = typeof body.appIcon === "string" ? body.appIcon : null;
+      db.isStoreOpen = typeof body.isStoreOpen === "boolean" ? body.isStoreOpen : db.isStoreOpen;
+      await saveDb(db);
+      return sendJson(res, 200, publicCatalog(db));
     }
 
     if (req.method === "POST" && req.url === "/api/auth/register") {

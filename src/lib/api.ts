@@ -1,4 +1,13 @@
 import type { User } from "./types";
+import type { Product } from "./types";
+
+export type CatalogState = {
+  products: Product[];
+  categories: string[];
+  storeName: string;
+  appIcon: string | null;
+  isStoreOpen: boolean;
+};
 
 type AuthResponse = {
   user: User | null;
@@ -32,5 +41,30 @@ export const authApi = {
     requestAuth("/api/auth/signout", {
       method: "POST",
       body: JSON.stringify({}),
+    }),
+};
+
+async function requestCatalog<T>(path: string, options: RequestInit = {}) {
+  const response = await fetch(path, {
+    headers: { "content-type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+  const data = (await response.json()) as T & { message?: string };
+  if (!response.ok) throw new Error(data.message || "Permintaan gagal.");
+  return data;
+}
+
+export const catalogApi = {
+  get: () => requestCatalog<CatalogState>("/api/catalog"),
+  bootstrap: (payload: CatalogState) =>
+    requestCatalog<CatalogState>("/api/catalog/bootstrap", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  save: (payload: CatalogState) =>
+    requestCatalog<CatalogState>("/api/catalog", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+      credentials: "include",
     }),
 };

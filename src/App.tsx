@@ -15,7 +15,7 @@ import AdminProducts from "./pages/admin/Products.tsx";
 import AdminOrders from "./pages/admin/Orders.tsx";
 import AdminSettings from "./pages/admin/Settings.tsx";
 import { RequireAuth } from "./components/RequireAuth.tsx";
-import { authApi } from "./lib/api.ts";
+import { authApi, catalogApi } from "./lib/api.ts";
 import { useApp } from "./lib/store.ts";
 
 const queryClient = new QueryClient();
@@ -25,11 +25,48 @@ const App = () => {
   const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
-    authApi
-      .session()
-      .then((data) => setUser(data.user))
-      .catch(() => setUser(null))
-      .finally(() => setSessionChecked(true));
+    let alive = true;
+
+    const load = async () => {
+      try {
+        const [session, catalog] = await Promise.all([authApi.session(), catalogApi.get()]);
+        if (!alive) return;
+        const local = useApp.getState();
+        setUser(session.user);
+        if (catalog.products.length === 0 && local.products.length > 0) {
+          const bootstrap = await catalogApi.bootstrap({
+            products: local.products,
+            categories: local.categories,
+            storeName: local.storeName,
+            appIcon: local.appIcon,
+            isStoreOpen: local.isStoreOpen,
+          });
+          if (!alive) return;
+          useApp.getState().hydrateCatalog(bootstrap);
+        } else {
+          useApp.getState().hydrateCatalog(catalog);
+        }
+      } catch {
+        if (!alive) return;
+        setUser(null);
+      } finally {
+        if (alive) setSessionChecked(true);
+      }
+    };
+
+    load();
+
+    const timer = window.setInterval(() => {
+      catalogApi.get().then((catalog) => {
+        if (!alive) return;
+        useApp.getState().hydrateCatalog(catalog);
+      }).catch(() => undefined);
+    }, 15000);
+
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
   }, [setUser]);
 
   if (!sessionChecked) {

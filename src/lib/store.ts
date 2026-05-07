@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CartItem, Order, OrderStatus, Product, User } from "./types";
+import { catalogApi } from "@/lib/api";
 import croissant from "@/assets/p-croissant.jpg";
 import coldbrew from "@/assets/p-coldbrew.jpg";
 import sourdough from "@/assets/p-sourdough.jpg";
@@ -37,6 +38,13 @@ interface AppState {
   // auth
   setUser: (u: User | null) => void;
   signOut: () => void;
+  hydrateCatalog: (catalog: {
+    products: Product[];
+    categories: string[];
+    storeName: string;
+    appIcon: string | null;
+    isStoreOpen: boolean;
+  }) => void;
 
   // cart
   addToCart: (productId: string, qty?: number) => void;
@@ -89,6 +97,14 @@ export const useApp = create<AppState>()(
 
       setUser: (u) => set({ user: u }),
       signOut: () => set({ user: null, cart: [] }),
+      hydrateCatalog: (catalog) =>
+        set({
+          products: catalog.products,
+          categories: catalog.categories,
+          storeName: catalog.storeName,
+          appIcon: catalog.appIcon,
+          isStoreOpen: catalog.isStoreOpen,
+        }),
 
       addToCart: (productId, qty = 1) => {
         if (!get().isStoreOpen) return;
@@ -150,6 +166,13 @@ export const useApp = create<AppState>()(
           orders: [order, ...get().orders],
           cart: [],
         });
+        void catalogApi.save({
+          products: newProducts,
+          categories: get().categories,
+          storeName: get().storeName,
+          appIcon: get().appIcon,
+          isStoreOpen: get().isStoreOpen,
+        }).catch(() => undefined);
         return order;
       },
       setOrderStatus: (id, status) => {
@@ -175,71 +198,132 @@ export const useApp = create<AppState>()(
 
       upsertProduct: (p) => {
         const exists = get().products.find((x) => x.id === p.id);
+        const products = exists
+          ? get().products.map((x) => (x.id === p.id ? p : x))
+          : [...get().products, p];
         set({
+          products,
+        });
+        void catalogApi.save({
           products: exists
             ? get().products.map((x) => (x.id === p.id ? p : x))
             : [...get().products, p],
-        });
+          categories: get().categories,
+          storeName: get().storeName,
+          appIcon: get().appIcon,
+          isStoreOpen: get().isStoreOpen,
+        }).catch(() => undefined);
       },
-      deleteProduct: (id) => set({ products: get().products.filter((p) => p.id !== id) }),
-      adjustStock: (id, delta) =>
+      deleteProduct: (id) => {
+        const products = get().products.filter((p) => p.id !== id);
+        set({ products });
+        void catalogApi.save({
+          products,
+          categories: get().categories,
+          storeName: get().storeName,
+          appIcon: get().appIcon,
+          isStoreOpen: get().isStoreOpen,
+        }).catch(() => undefined);
+      },
+      adjustStock: (id, delta) => {
+        const products = get().products.map((p) =>
+          p.id === id ? { ...p, stock: Math.max(0, p.stock + delta) } : p
+        );
         set({
-          products: get().products.map((p) =>
-            p.id === id ? { ...p, stock: Math.max(0, p.stock + delta) } : p
-          ),
-        }),
-
+          products,
+        });
+        void catalogApi.save({
+          products,
+          categories: get().categories,
+          storeName: get().storeName,
+          appIcon: get().appIcon,
+          isStoreOpen: get().isStoreOpen,
+        }).catch(() => undefined);
+      },
 
       addCategory: (name) => {
         const trimmed = name.trim();
         if (!trimmed) return;
         const cats = get().categories;
         if (cats.some((c) => c.toLowerCase() === trimmed.toLowerCase())) return;
-        set({ categories: [...cats, trimmed] });
+        const categories = [...cats, trimmed];
+        set({ categories });
+        void catalogApi.save({
+          products: get().products,
+          categories,
+          storeName: get().storeName,
+          appIcon: get().appIcon,
+          isStoreOpen: get().isStoreOpen,
+        }).catch(() => undefined);
       },
       renameCategory: (oldName, newName) => {
         const trimmed = newName.trim();
         if (!trimmed) return;
-        set({
-          categories: get().categories.map((c) => (c === oldName ? trimmed : c)),
-          products: get().products.map((p) => (p.category === oldName ? { ...p, category: trimmed } : p)),
-        });
+        const categories = get().categories.map((c) => (c === oldName ? trimmed : c));
+        const products = get().products.map((p) => (p.category === oldName ? { ...p, category: trimmed } : p));
+        set({ categories, products });
+        void catalogApi.save({
+          products,
+          categories,
+          storeName: get().storeName,
+          appIcon: get().appIcon,
+          isStoreOpen: get().isStoreOpen,
+        }).catch(() => undefined);
       },
       removeCategory: (name) => {
         if (get().products.some((p) => p.category === name)) return;
-        set({ categories: get().categories.filter((c) => c !== name) });
+        const categories = get().categories.filter((c) => c !== name);
+        set({ categories });
+        void catalogApi.save({
+          products: get().products,
+          categories,
+          storeName: get().storeName,
+          appIcon: get().appIcon,
+          isStoreOpen: get().isStoreOpen,
+        }).catch(() => undefined);
       },
 
       markNotificationsRead: () =>
         set({ notifications: get().notifications.map((n) => ({ ...n, read: true })) }),
 
-      setStoreName: (name) => set({ storeName: name.trim() || "QuickPick POS" }),
-      setAppIcon: (icon) => set({ appIcon: icon }),
-      setStoreOpen: (open) => set({ isStoreOpen: open }),
+      setStoreName: (name) => {
+        const storeName = name.trim() || "QuickPick POS";
+        set({ storeName });
+        void catalogApi.save({
+          products: get().products,
+          categories: get().categories,
+          storeName,
+          appIcon: get().appIcon,
+          isStoreOpen: get().isStoreOpen,
+        }).catch(() => undefined);
+      },
+      setAppIcon: (icon) => {
+        set({ appIcon: icon });
+        void catalogApi.save({
+          products: get().products,
+          categories: get().categories,
+          storeName: get().storeName,
+          appIcon: icon,
+          isStoreOpen: get().isStoreOpen,
+        }).catch(() => undefined);
+      },
+      setStoreOpen: (open) => {
+        set({ isStoreOpen: open });
+        void catalogApi.save({
+          products: get().products,
+          categories: get().categories,
+          storeName: get().storeName,
+          appIcon: get().appIcon,
+          isStoreOpen: open,
+        }).catch(() => undefined);
+      },
     }),
     {
       name: "quickpick-pos",
-      partialize: (state) => ({
-        products: state.products,
-        categories: state.categories,
-        cart: state.cart,
-        orders: state.orders,
-        storeName: state.storeName,
-        appIcon: state.appIcon,
-        isStoreOpen: state.isStoreOpen,
-        notifications: state.notifications,
-      }),
+      partialize: (state) => ({ cart: state.cart }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppState>;
-        const merged = { ...current, ...p, user: null } as AppState;
-        if (!merged.categories || merged.categories.length === 0) {
-          const fromProducts = Array.from(new Set((merged.products ?? []).map((x) => x.category)));
-          merged.categories = fromProducts.length ? fromProducts : seedCategories;
-        }
-        if (!merged.storeName) merged.storeName = "QuickPick POS";
-        if (typeof merged.isStoreOpen !== "boolean") merged.isStoreOpen = true;
-        if (!("appIcon" in merged)) merged.appIcon = null;
-        return merged;
+        return { ...current, ...p, user: null } as AppState;
       },
     }
   )
