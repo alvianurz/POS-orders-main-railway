@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, extname } from "node:path";
 import { randomBytes, pbkdf2Sync, timingSafeEqual } from "node:crypto";
@@ -39,6 +39,15 @@ const publicCatalog = (db) => ({
 
 const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 
+const emptyDb = () => ({
+  users: [],
+  products: [],
+  categories: [],
+  storeName: "QuickPick POS",
+  appIcon: null,
+  isStoreOpen: true,
+});
+
 const hashPassword = (password) => {
   const salt = randomBytes(16).toString("hex");
   const hash = pbkdf2Sync(password, salt, 210000, 32, "sha256").toString("hex");
@@ -56,14 +65,7 @@ const verifyPassword = (password, stored) => {
 const loadDb = async () => {
   await mkdir(dataDir, { recursive: true });
   if (!existsSync(dbPath)) {
-    const initial = {
-      users: [],
-      products: [],
-      categories: [],
-      storeName: "QuickPick POS",
-      appIcon: null,
-      isStoreOpen: true,
-    };
+    const initial = emptyDb();
     const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
     const adminPassword = process.env.ADMIN_PASSWORD;
     if (adminEmail && adminPassword) {
@@ -80,7 +82,42 @@ const loadDb = async () => {
     await writeFile(dbPath, JSON.stringify(initial, null, 2));
     return initial;
   }
-  const db = JSON.parse(await readFile(dbPath, "utf8"));
+  let db;
+  try {
+    const parsed = JSON.parse(await readFile(dbPath, "utf8"));
+    db = parsed && typeof parsed === "object" ? parsed : emptyDb();
+  } catch (error) {
+    const backupPath = `${dbPath}.corrupt-${Date.now()}`;
+    await copyFile(dbPath, backupPath).catch(() => undefined);
+    console.error(`Database file could not be read. A backup was saved to ${backupPath}.`, error);
+    db = emptyDb();
+  }
+  let normalized = false;
+  if (!Array.isArray(db.users)) {
+    db.users = [];
+    normalized = true;
+  }
+  if (!Array.isArray(db.products)) {
+    db.products = [];
+    normalized = true;
+  }
+  if (!Array.isArray(db.categories)) {
+    db.categories = [];
+    normalized = true;
+  }
+  if (typeof db.storeName !== "string" || !db.storeName) {
+    db.storeName = "QuickPick POS";
+    normalized = true;
+  }
+  if (typeof db.appIcon === "undefined") {
+    db.appIcon = null;
+    normalized = true;
+  }
+  if (typeof db.isStoreOpen !== "boolean") {
+    db.isStoreOpen = true;
+    normalized = true;
+  }
+
   const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
   const adminPassword = process.env.ADMIN_PASSWORD;
   if (adminEmail && adminPassword && !db.users.some((user) => user.email === adminEmail)) {
@@ -94,12 +131,9 @@ const loadDb = async () => {
       createdAt: Date.now(),
     });
     await saveDb(db);
+    normalized = false;
   }
-  if (!Array.isArray(db.products)) db.products = [];
-  if (!Array.isArray(db.categories) || db.categories.length === 0) db.categories = [];
-  if (typeof db.storeName !== "string" || !db.storeName) db.storeName = "QuickPick POS";
-  if (typeof db.appIcon === "undefined") db.appIcon = null;
-  if (typeof db.isStoreOpen !== "boolean") db.isStoreOpen = true;
+  if (normalized) await saveDb(db);
   return db;
 };
 
