@@ -323,7 +323,11 @@ export const useApp = create<AppState>()(
       partialize: (state) => ({ cart: state.cart }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppState>;
-        return { ...current, ...p, user: null } as AppState;
+        return {
+          ...current,
+          cart: Array.isArray(p.cart) ? p.cart : [],
+          user: null,
+        } as AppState;
       },
     }
   )

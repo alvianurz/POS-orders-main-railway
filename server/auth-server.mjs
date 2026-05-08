@@ -23,7 +23,10 @@ const seedProducts = [
 ];
 const seedCategories = ["Roti", "Minuman", "Camilan", "Kebutuhan Dapur", "Sayur & Buah"];
 
-const jsonHeaders = { "content-type": "application/json; charset=utf-8" };
+const jsonHeaders = {
+  "content-type": "application/json; charset=utf-8",
+  "cache-control": "no-store",
+};
 
 const publicUser = ({ id, name, email, phone, role }) => ({ id, name, email, phone, role });
 const publicCatalog = (db) => ({
@@ -273,7 +276,12 @@ const serveStatic = async (req, res) => {
   const finalPath = existsSync(safePath) ? safePath : join(distDir, "index.html");
   try {
     const file = await readFile(finalPath);
-    res.writeHead(200, { "content-type": contentType[extname(finalPath)] || "application/octet-stream" });
+    const ext = extname(finalPath);
+    const cacheControl = ext === ".html" ? "no-store" : "public, max-age=31536000, immutable";
+    res.writeHead(200, {
+      "content-type": contentType[ext] || "application/octet-stream",
+      "cache-control": cacheControl,
+    });
     res.end(file);
   } catch {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });

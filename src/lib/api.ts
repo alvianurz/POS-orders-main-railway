@@ -46,6 +46,7 @@ export const authApi = {
 
 async function requestCatalog<T>(path: string, options: RequestInit = {}) {
   const response = await fetch(path, {
+    cache: "no-store",
     headers: { "content-type": "application/json", ...(options.headers || {}) },
     ...options,
   });
