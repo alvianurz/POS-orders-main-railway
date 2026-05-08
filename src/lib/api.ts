@@ -1,5 +1,5 @@
 import type { User } from "./types";
-import type { Product } from "./types";
+import type { CartItem, Order, OrderStatus, Product } from "./types";
 
 export type CatalogState = {
   products: Product[];
@@ -67,5 +67,31 @@ export const catalogApi = {
       method: "PUT",
       body: JSON.stringify(payload),
       credentials: "include",
+    }),
+};
+
+async function requestOrders<T>(path: string, options: RequestInit = {}) {
+  const response = await fetch(path, {
+    cache: "no-store",
+    credentials: "include",
+    headers: { "content-type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+  const data = (await response.json()) as T & { message?: string };
+  if (!response.ok) throw new Error(data.message || "Permintaan gagal.");
+  return data;
+}
+
+export const orderApi = {
+  list: () => requestOrders<{ orders: Order[] }>("/api/orders"),
+  create: (payload: { items: CartItem[] }) =>
+    requestOrders<{ order: Order; catalog: CatalogState }>("/api/orders", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  update: (id: string, payload: { status?: OrderStatus; paid?: boolean }) =>
+    requestOrders<{ order: Order }>("/api/orders/" + encodeURIComponent(id), {
+      method: "PATCH",
+      body: JSON.stringify(payload),
     }),
 };

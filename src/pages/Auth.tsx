@@ -12,6 +12,7 @@ import { authApi } from "@/lib/api";
 export default function Auth() {
   const nav = useNavigate();
   const setUser = useApp((s) => s.setUser);
+  const refreshOrders = useApp((s) => s.refreshOrders);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -32,6 +33,7 @@ export default function Auth() {
           : await authApi.signIn(form.email, form.password);
       if (!data.user) throw new Error("Sesi tidak ditemukan.");
       setUser(data.user);
+      await refreshOrders();
       toast.success(data.user.role === "admin" ? "Selamat datang kembali, admin" : "Berhasil masuk");
       nav(data.user.role === "admin" ? "/admin" : "/");
     } catch (error) {

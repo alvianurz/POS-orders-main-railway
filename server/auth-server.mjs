@@ -60,12 +60,18 @@ const publicCatalog = (db) => ({
   isStoreOpen: typeof db.isStoreOpen === "boolean" ? db.isStoreOpen : true,
 });
 
+const persistedAppState = (db) => ({
+  ...publicCatalog(db),
+  orders: Array.isArray(db.orders) ? db.orders : [],
+});
+
 const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 
 const emptyDb = () => ({
   users: [],
   products: [],
   categories: [],
+  orders: [],
   storeName: DEFAULT_STORE_NAME,
   appIcon: DEFAULT_APP_ICON,
   isStoreOpen: true,
@@ -76,6 +82,7 @@ const normalizeDb = (db) => {
   if (!Array.isArray(normalized.users)) normalized.users = [];
   if (!Array.isArray(normalized.products)) normalized.products = [];
   if (!Array.isArray(normalized.categories)) normalized.categories = [];
+  if (!Array.isArray(normalized.orders)) normalized.orders = [];
   normalized.storeName = normalizeStoreName(normalized.storeName);
   normalized.appIcon = normalizeAppIcon(normalized.appIcon);
   if (typeof normalized.isStoreOpen !== "boolean") normalized.isStoreOpen = true;
@@ -137,6 +144,10 @@ const loadFileDb = async () => {
   }
   if (!Array.isArray(db.categories)) {
     db.categories = [];
+    normalized = true;
+  }
+  if (!Array.isArray(db.orders)) {
+    db.orders = [];
     normalized = true;
   }
   if (typeof db.storeName !== "string" || !db.storeName || db.storeName === LEGACY_STORE_NAME) {
@@ -215,7 +226,7 @@ const ensurePostgres = async () => {
   } else if (existingState.rowCount === 0) {
     await pool.query(
       "INSERT INTO app_state (key, value) VALUES ('catalog', $1::jsonb) ON CONFLICT (key) DO NOTHING",
-      [JSON.stringify(publicCatalog(emptyDb()))]
+      [JSON.stringify(persistedAppState(emptyDb()))]
     );
   }
 };
@@ -269,7 +280,7 @@ const savePostgresDb = async (db) => {
       `INSERT INTO app_state (key, value)
        VALUES ('catalog', $1::jsonb)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-      [JSON.stringify(publicCatalog(normalized))]
+      [JSON.stringify(persistedAppState(normalized))]
     );
     await client.query("COMMIT");
   } catch (error) {
@@ -356,24 +367,131 @@ const createSession = (userId) => {
   return sid;
 };
 
+const genPickup = () =>
+  "QP-" +
+  Math.random().toString(36).slice(2, 5).toUpperCase() +
+  "-" +
+  Math.floor(100 + Math.random() * 900);
+
+const sortOrders = (orders) =>
+  [...(Array.isArray(orders) ? orders : [])].sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+
+const ordersForUser = (db, user) => {
+  if (user.role === "admin") return sortOrders(db.orders);
+  const email = normalizeEmail(user.email);
+  return sortOrders(db.orders).filter((order) => normalizeEmail(order.customerEmail) === email);
+};
+
+const normalizeCartItems = (items) => {
+  if (!Array.isArray(items)) return [];
+  const normalized = items
+    .map((item) => ({
+      productId: String(item?.productId || ""),
+      quantity: Math.floor(Number(item?.quantity || 0)),
+    }))
+    .filter((item) => item.productId && item.quantity > 0);
+  const byProduct = new Map();
+  for (const item of normalized) {
+    byProduct.set(item.productId, (byProduct.get(item.productId) || 0) + item.quantity);
+  }
+  return [...byProduct.entries()].map(([productId, quantity]) => ({ productId, quantity }));
+};
+
+const createOrder = async (user, body) => {
+  const itemsInput = normalizeCartItems(body.items);
+  if (!itemsInput.length) {
+    return { status: 400, payload: { message: "Keranjang kosong." } };
+  }
+
+  const db = await loadDb();
+  if (!db.isStoreOpen) {
+    return { status: 409, payload: { message: "Toko sedang tutup." } };
+  }
+
+  const orderItems = [];
+  for (const item of itemsInput) {
+    const product = db.products.find((candidate) => candidate.id === item.productId);
+    if (!product || Number(product.stock) < item.quantity) {
+      return { status: 409, payload: { message: "Stok produk tidak cukup." } };
+    }
+    orderItems.push({
+      productId: product.id,
+      name: product.name,
+      price: Number(product.price || 0),
+      quantity: item.quantity,
+    });
+  }
+
+  const order = {
+    id: `o_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
+    pickupId: genPickup(),
+    customerName: user.name,
+    customerPhone: user.phone,
+    customerEmail: user.email,
+    items: orderItems,
+    total: orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    status: "Pending",
+    createdAt: Date.now(),
+    paid: false,
+  };
+
+  db.products = db.products.map((product) => {
+    const item = itemsInput.find((candidate) => candidate.productId === product.id);
+    return item ? { ...product, stock: Number(product.stock || 0) - item.quantity } : product;
+  });
+  db.orders = [order, ...sortOrders(db.orders)];
+  await saveDb(db);
+  return { status: 201, payload: { order, catalog: publicCatalog(db) } };
+};
+
+const updateOrder = async (user, orderId, body) => {
+  if (user.role !== "admin") {
+    return { status: 401, payload: { message: "Hanya admin yang dapat mengubah pesanan." } };
+  }
+
+  const db = await loadDb();
+  const order = db.orders.find((item) => item.id === orderId);
+  if (!order) {
+    return { status: 404, payload: { message: "Pesanan tidak ditemukan." } };
+  }
+
+  const validStatuses = new Set(["Pending", "Preparing", "Ready", "Completed"]);
+  if (typeof body.status !== "undefined") {
+    if (!validStatuses.has(body.status)) {
+      return { status: 400, payload: { message: "Status pesanan tidak valid." } };
+    }
+    order.status = body.status;
+  }
+  if (typeof body.paid === "boolean") {
+    order.paid = body.paid;
+    if (body.paid) order.status = "Completed";
+  }
+
+  await saveDb(db);
+  return { status: 200, payload: { order } };
+};
+
 const handleApi = async (req, res) => {
   try {
-    if (req.method === "GET" && req.url === "/health") {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const pathname = url.pathname;
+
+    if (req.method === "GET" && pathname === "/health") {
       res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
       return res.end("ok");
     }
 
-    if (req.method === "GET" && req.url === "/api/auth/session") {
+    if (req.method === "GET" && pathname === "/api/auth/session") {
       const user = await currentUser(req);
       return sendJson(res, 200, { user });
     }
 
-    if (req.method === "GET" && req.url === "/api/catalog") {
+    if (req.method === "GET" && pathname === "/api/catalog") {
       const db = await loadDb();
       return sendJson(res, 200, publicCatalog(db));
     }
 
-    if (req.method === "POST" && req.url === "/api/catalog/bootstrap") {
+    if (req.method === "POST" && pathname === "/api/catalog/bootstrap") {
       const body = await readBody(req);
       const db = await loadDb();
       if ((db.products ?? []).length > 0) {
@@ -388,7 +506,7 @@ const handleApi = async (req, res) => {
       return sendJson(res, 201, publicCatalog(db));
     }
 
-    if (req.method === "PUT" && req.url === "/api/catalog") {
+    if (req.method === "PUT" && pathname === "/api/catalog") {
       const me = await currentUser(req);
       if (!me || me.role !== "admin") {
         return sendJson(res, 401, { message: "Hanya admin yang dapat mengubah katalog." });
@@ -404,7 +522,31 @@ const handleApi = async (req, res) => {
       return sendJson(res, 200, publicCatalog(db));
     }
 
-    if (req.method === "POST" && req.url === "/api/auth/register") {
+    if (req.method === "GET" && pathname === "/api/orders") {
+      const me = await currentUser(req);
+      if (!me) return sendJson(res, 401, { message: "Masuk terlebih dahulu." });
+      const db = await loadDb();
+      return sendJson(res, 200, { orders: ordersForUser(db, me) });
+    }
+
+    if (req.method === "POST" && pathname === "/api/orders") {
+      const me = await currentUser(req);
+      if (!me) return sendJson(res, 401, { message: "Masuk terlebih dahulu." });
+      const body = await readBody(req);
+      const result = await createOrder(me, body);
+      return sendJson(res, result.status, result.payload);
+    }
+
+    const orderMatch = pathname.match(/^\/api\/orders\/([^/]+)$/);
+    if (req.method === "PATCH" && orderMatch) {
+      const me = await currentUser(req);
+      if (!me) return sendJson(res, 401, { message: "Masuk terlebih dahulu." });
+      const body = await readBody(req);
+      const result = await updateOrder(me, decodeURIComponent(orderMatch[1]), body);
+      return sendJson(res, result.status, result.payload);
+    }
+
+    if (req.method === "POST" && pathname === "/api/auth/register") {
       const body = await readBody(req);
       const name = String(body.name || "").trim();
       const phone = String(body.phone || "").trim();
@@ -435,7 +577,7 @@ const handleApi = async (req, res) => {
       return sendJson(res, 201, { user: publicUser(user) }, { "set-cookie": sessionCookie(sid) });
     }
 
-    if (req.method === "POST" && req.url === "/api/auth/signin") {
+    if (req.method === "POST" && pathname === "/api/auth/signin") {
       const body = await readBody(req);
       const email = normalizeEmail(body.email);
       const password = String(body.password || "");
@@ -448,7 +590,7 @@ const handleApi = async (req, res) => {
       return sendJson(res, 200, { user: publicUser(user) }, { "set-cookie": sessionCookie(sid) });
     }
 
-    if (req.method === "POST" && req.url === "/api/auth/signout") {
+    if (req.method === "POST" && pathname === "/api/auth/signout") {
       const sid = getCookie(req, "qp_session");
       if (sid) sessions.delete(sid);
       return sendJson(res, 200, { ok: true }, { "set-cookie": sessionCookie("", 0) });

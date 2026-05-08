@@ -20,13 +20,17 @@ export default function Cart() {
 
   const total = lines.reduce((s, l) => s + l.product.price * l.quantity, 0);
 
-  const checkout = () => {
+  const checkout = async () => {
     if (!isStoreOpen) return toast.error("Toko sedang tutup");
     if (!user) return nav("/auth");
-    const order = placeOrder();
-    if (!order) return toast.error("Pesanan gagal dibuat, periksa stok produk");
-    toast.success(`Pesanan dibuat. ID ambil ${order.pickupId}`);
-    nav(`/orders/${order.id}`);
+    try {
+      const order = await placeOrder();
+      if (!order) return toast.error("Pesanan gagal dibuat, periksa stok produk");
+      toast.success(`Pesanan dibuat. ID ambil ${order.pickupId}`);
+      nav(`/orders/${order.id}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Pesanan gagal dibuat");
+    }
   };
 
   return (

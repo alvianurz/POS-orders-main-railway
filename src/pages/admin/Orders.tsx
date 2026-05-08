@@ -42,6 +42,26 @@ export default function AdminOrders() {
     [orders, q, filter]
   );
 
+  const changeStatus = async (order: Order, status: OrderStatus) => {
+    try {
+      await setOrderStatus(order.id, status);
+      setOpen({ ...order, status });
+      toast.success(`Status menjadi ${statusLabels[status]}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Status gagal diperbarui");
+    }
+  };
+
+  const completePayment = async (order: Order) => {
+    try {
+      await markPaid(order.id);
+      setOpen({ ...order, paid: true, status: "Completed" });
+      toast.success("Pesanan dibayar dan selesai");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Pesanan gagal diperbarui");
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -141,7 +161,7 @@ export default function AdminOrders() {
                         <Button
                           key={s}
                           variant={open.status === s ? "default" : "secondary"}
-                          onClick={() => { setOrderStatus(open.id, s); setOpen({ ...open, status: s }); toast.success(`Status menjadi ${statusLabels[s]}`); }}
+                          onClick={() => void changeStatus(open, s)}
                           className="font-bold"
                         >
                           {statusLabels[s]}
@@ -151,7 +171,7 @@ export default function AdminOrders() {
                   </div>
 
                   {!open.paid && (
-                    <Button size="lg" className="w-full font-bold" onClick={() => { markPaid(open.id); setOpen({ ...open, paid: true, status: "Completed" }); toast.success("Pesanan dibayar dan selesai"); }}>
+                    <Button size="lg" className="w-full font-bold" onClick={() => void completePayment(open)}>
                       Tandai dibayar & selesai
                     </Button>
                   )}

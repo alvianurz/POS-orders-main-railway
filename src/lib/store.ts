@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CartItem, Order, OrderStatus, Product, User } from "./types";
-import { catalogApi } from "@/lib/api";
+import { catalogApi, orderApi } from "@/lib/api";
 import { DEFAULT_APP_ICON, DEFAULT_STORE_NAME } from "@/lib/brand";
 import croissant from "@/assets/p-croissant.jpg";
 import coldbrew from "@/assets/p-coldbrew.jpg";
@@ -46,6 +46,8 @@ interface AppState {
     appIcon: string | null;
     isStoreOpen: boolean;
   }) => void;
+  hydrateOrders: (orders: Order[]) => void;
+  refreshOrders: () => Promise<void>;
 
   // cart
   addToCart: (productId: string, qty?: number) => void;
@@ -54,9 +56,9 @@ interface AppState {
   clearCart: () => void;
 
   // orders
-  placeOrder: () => Order | null;
-  setOrderStatus: (id: string, status: OrderStatus) => void;
-  markPaid: (id: string) => void;
+  placeOrder: () => Promise<Order | null>;
+  setOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
+  markPaid: (id: string) => Promise<void>;
 
   // products (admin)
   upsertProduct: (p: Product) => void;
@@ -77,12 +79,6 @@ interface AppState {
   setStoreOpen: (open: boolean) => void;
 }
 
-const genPickup = () =>
-  "QP-" +
-  Math.random().toString(36).slice(2, 5).toUpperCase() +
-  "-" +
-  Math.floor(100 + Math.random() * 900);
-
 export const useApp = create<AppState>()(
   persist(
     (set, get) => ({
@@ -97,7 +93,7 @@ export const useApp = create<AppState>()(
       notifications: [],
 
       setUser: (u) => set({ user: u }),
-      signOut: () => set({ user: null, cart: [] }),
+      signOut: () => set({ user: null, cart: [], orders: [], notifications: [] }),
       hydrateCatalog: (catalog) =>
         set({
           products: catalog.products,
@@ -106,6 +102,16 @@ export const useApp = create<AppState>()(
           appIcon: catalog.appIcon,
           isStoreOpen: catalog.isStoreOpen,
         }),
+      hydrateOrders: (orders) => set({ orders }),
+      refreshOrders: async () => {
+        const user = get().user;
+        if (!user) {
+          set({ orders: [] });
+          return;
+        }
+        const data = await orderApi.list();
+        set({ orders: data.orders });
+      },
 
       addToCart: (productId, qty = 1) => {
         if (!get().isStoreOpen) return;
@@ -132,7 +138,7 @@ export const useApp = create<AppState>()(
         set({ cart: get().cart.filter((c) => c.productId !== productId) }),
       clearCart: () => set({ cart: [] }),
 
-      placeOrder: () => {
+      placeOrder: async () => {
         const { cart, products, user, isStoreOpen } = get();
         if (!isStoreOpen || !cart.length || !user) return null;
         // validate stock
@@ -140,48 +146,25 @@ export const useApp = create<AppState>()(
           const p = products.find((x) => x.id === c.productId);
           if (!p || p.stock < c.quantity) return null;
         }
-        const items = cart.map((c) => {
-          const p = products.find((x) => x.id === c.productId)!;
-          return { productId: p.id, name: p.name, price: p.price, quantity: c.quantity };
-        });
-        const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
-        const order: Order = {
-          id: "o_" + Date.now().toString(36),
-          pickupId: genPickup(),
-          customerName: user.name,
-          customerPhone: user.phone,
-          customerEmail: user.email,
-          items,
-          total,
-          status: "Pending",
-          createdAt: Date.now(),
-          paid: false,
-        };
-        // reduce stock atomically
-        const newProducts = products.map((p) => {
-          const ci = cart.find((c) => c.productId === p.id);
-          return ci ? { ...p, stock: p.stock - ci.quantity } : p;
-        });
+        const data = await orderApi.create({ items: cart });
         set({
-          products: newProducts,
-          orders: [order, ...get().orders],
+          products: data.catalog.products,
+          categories: data.catalog.categories,
+          storeName: data.catalog.storeName,
+          appIcon: data.catalog.appIcon,
+          isStoreOpen: data.catalog.isStoreOpen,
+          orders: [data.order, ...get().orders.filter((order) => order.id !== data.order.id)],
           cart: [],
         });
-        void catalogApi.save({
-          products: newProducts,
-          categories: get().categories,
-          storeName: get().storeName,
-          appIcon: get().appIcon,
-          isStoreOpen: get().isStoreOpen,
-        }).catch(() => undefined);
-        return order;
+        return data.order;
       },
-      setOrderStatus: (id, status) => {
+      setOrderStatus: async (id, status) => {
+        const data = await orderApi.update(id, { status });
         set({
-          orders: get().orders.map((o) => (o.id === id ? { ...o, status } : o)),
+          orders: get().orders.map((o) => (o.id === id ? data.order : o)),
         });
         if (status === "Ready") {
-          const o = get().orders.find((x) => x.id === id);
+          const o = data.order;
           if (o) {
             set({
               notifications: [
@@ -192,10 +175,12 @@ export const useApp = create<AppState>()(
           }
         }
       },
-      markPaid: (id) =>
+      markPaid: async (id) => {
+        const data = await orderApi.update(id, { paid: true });
         set({
-          orders: get().orders.map((o) => (o.id === id ? { ...o, paid: true, status: "Completed" } : o)),
-        }),
+          orders: get().orders.map((o) => (o.id === id ? data.order : o)),
+        });
+      },
 
       upsertProduct: (p) => {
         const exists = get().products.find((x) => x.id === p.id);

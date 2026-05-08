@@ -15,7 +15,7 @@ import AdminProducts from "./pages/admin/Products.tsx";
 import AdminOrders from "./pages/admin/Orders.tsx";
 import AdminSettings from "./pages/admin/Settings.tsx";
 import { RequireAuth } from "./components/RequireAuth.tsx";
-import { authApi, catalogApi } from "./lib/api.ts";
+import { authApi, catalogApi, orderApi } from "./lib/api.ts";
 import { useApp } from "./lib/store.ts";
 
 const queryClient = new QueryClient();
@@ -33,6 +33,13 @@ const App = () => {
         if (!alive) return;
         const local = useApp.getState();
         setUser(session.user);
+        if (session.user) {
+          const orderData = await orderApi.list();
+          if (!alive) return;
+          useApp.getState().hydrateOrders(orderData.orders);
+        } else {
+          useApp.getState().hydrateOrders([]);
+        }
         if (catalog.products.length === 0 && local.products.length > 0) {
           const bootstrap = await catalogApi.bootstrap({
             products: local.products,
@@ -57,10 +64,17 @@ const App = () => {
     load();
 
     const timer = window.setInterval(() => {
-      catalogApi.get().then((catalog) => {
+      const state = useApp.getState();
+      void catalogApi.get().then((catalog) => {
         if (!alive) return;
         useApp.getState().hydrateCatalog(catalog);
       }).catch(() => undefined);
+      if (state.user) {
+        void orderApi.list().then((data) => {
+          if (!alive) return;
+          useApp.getState().hydrateOrders(data.orders);
+        }).catch(() => undefined);
+      }
     }, 15000);
 
     return () => {
