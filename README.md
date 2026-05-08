@@ -1,6 +1,6 @@
-# QuickPick Orders
+# Toko Ar-Rahmah Orders
 
-QuickPick Orders adalah aplikasi pemesanan produk berbasis Vite, React, dan backend Node sederhana untuk autentikasi.
+Toko Ar-Rahmah Orders adalah aplikasi pemesanan produk berbasis Vite, React, dan backend Node sederhana untuk autentikasi.
 
 ## Kebutuhan
 

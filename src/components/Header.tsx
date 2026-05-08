@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { ShoppingCart, Bell, LogOut, LayoutDashboard, Store, Receipt, HelpCircle, Settings2, type LucideIcon } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { DEFAULT_APP_ICON, DEFAULT_STORE_NAME } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { authApi } from "@/lib/api";
@@ -15,11 +16,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function Header() {
-  const { user, cart, signOut, notifications, markNotificationsRead, appIcon, isStoreOpen } = useApp();
+  const { user, cart, signOut, notifications, markNotificationsRead, appIcon, storeName, isStoreOpen } = useApp();
   const cartCount = cart.reduce((s, c) => s + c.quantity, 0);
   const unread = notifications.filter((n) => !n.read).length;
   const { pathname } = useLocation();
   const isAdmin = user?.role === "admin";
+  const displayName = storeName.trim() || DEFAULT_STORE_NAME;
+  const iconHref = appIcon || DEFAULT_APP_ICON;
 
   const handleSignOut = async () => {
     try {
@@ -30,7 +33,6 @@ export default function Header() {
   };
 
   useEffect(() => {
-    const iconHref = appIcon || "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a1a1a'/%3E%3Cpath d='M20 28h24l-3 16H23z' fill='white'/%3E%3Cpath d='M24 20h16l2 8H22z' fill='white' opacity='.85'/%3E%3C/svg%3E";
     let linkEl = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
     if (!linkEl) {
       linkEl = document.createElement("link");
@@ -38,22 +40,19 @@ export default function Header() {
       document.head.appendChild(linkEl);
     }
     linkEl.href = iconHref;
-  }, [appIcon]);
+    document.title = `${displayName} - Pre-order & Pickup`;
+  }, [displayName, iconHref]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/92 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl">
       <div className="container flex h-16 items-center justify-between gap-2 sm:gap-4">
         <Link to="/" className="flex items-center gap-2 group min-w-0">
           <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-primary overflow-hidden grid place-items-center font-display font-bold text-primary-foreground glow-primary group-hover:scale-105 transition-transform">
-            {appIcon ? (
-              <img src={appIcon} alt="" className="h-full w-full object-cover" />
-            ) : (
-              "Q"
-            )}
+            <img src={iconHref} alt="" className="h-full w-full object-cover" />
           </div>
-          <div className="leading-none hidden xs:block sm:block">
-            <div className="font-display font-bold text-lg tracking-tight">QuickPick</div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-mono">POS</div>
+          <div className="hidden min-w-0 leading-none xs:block sm:block">
+            <div className="max-w-[9rem] truncate font-display text-lg font-bold tracking-tight sm:max-w-[14rem]">{displayName}</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-mono">Pre-order</div>
           </div>
         </Link>
 

@@ -10,6 +10,9 @@ const dataDir = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH ||
 const dbPath = join(dataDir, "auth.json");
 const distDir = join(rootDir, "dist");
 const sessions = new Map();
+const DEFAULT_STORE_NAME = "Toko Ar-Rahmah";
+const DEFAULT_APP_ICON = "/brand/logo.png";
+const LEGACY_STORE_NAME = "QuickPick POS";
 
 const seedProducts = [
   { id: "p1", name: "Croissant Mentega", price: 35000, category: "Roti", image: "/assets/p-croissant-D5hPY4CY.jpg", stock: 24, description: "Renyah, wangi mentega, dipanggang setiap hari." },
@@ -29,11 +32,22 @@ const jsonHeaders = {
 };
 
 const publicUser = ({ id, name, email, phone, role }) => ({ id, name, email, phone, role });
+
+const normalizeStoreName = (name) => {
+  const value = typeof name === "string" ? name.trim() : "";
+  return value && value !== LEGACY_STORE_NAME ? value : DEFAULT_STORE_NAME;
+};
+
+const normalizeAppIcon = (icon) => {
+  const value = typeof icon === "string" ? icon.trim() : "";
+  return value || DEFAULT_APP_ICON;
+};
+
 const publicCatalog = (db) => ({
   products: db.products ?? [],
   categories: db.categories ?? [],
-  storeName: db.storeName ?? "QuickPick POS",
-  appIcon: db.appIcon ?? null,
+  storeName: normalizeStoreName(db.storeName),
+  appIcon: normalizeAppIcon(db.appIcon),
   isStoreOpen: typeof db.isStoreOpen === "boolean" ? db.isStoreOpen : true,
 });
 
@@ -43,8 +57,8 @@ const emptyDb = () => ({
   users: [],
   products: [],
   categories: [],
-  storeName: "QuickPick POS",
-  appIcon: null,
+  storeName: DEFAULT_STORE_NAME,
+  appIcon: DEFAULT_APP_ICON,
   isStoreOpen: true,
 });
 
@@ -105,12 +119,12 @@ const loadDb = async () => {
     db.categories = [];
     normalized = true;
   }
-  if (typeof db.storeName !== "string" || !db.storeName) {
-    db.storeName = "QuickPick POS";
+  if (typeof db.storeName !== "string" || !db.storeName || db.storeName === LEGACY_STORE_NAME) {
+    db.storeName = DEFAULT_STORE_NAME;
     normalized = true;
   }
   if (typeof db.appIcon === "undefined") {
-    db.appIcon = null;
+    db.appIcon = DEFAULT_APP_ICON;
     normalized = true;
   }
   if (typeof db.isStoreOpen !== "boolean") {
@@ -212,8 +226,8 @@ const handleApi = async (req, res) => {
       }
       db.products = Array.isArray(body.products) ? body.products : seedProducts;
       db.categories = Array.isArray(body.categories) && body.categories.length ? body.categories : seedCategories;
-      db.storeName = typeof body.storeName === "string" && body.storeName.trim() ? body.storeName.trim() : "QuickPick POS";
-      db.appIcon = typeof body.appIcon === "string" ? body.appIcon : null;
+      db.storeName = normalizeStoreName(body.storeName);
+      db.appIcon = normalizeAppIcon(body.appIcon);
       db.isStoreOpen = typeof body.isStoreOpen === "boolean" ? body.isStoreOpen : true;
       await saveDb(db);
       return sendJson(res, 201, publicCatalog(db));
@@ -228,8 +242,8 @@ const handleApi = async (req, res) => {
       const db = await loadDb();
       db.products = Array.isArray(body.products) ? body.products : db.products;
       db.categories = Array.isArray(body.categories) ? body.categories : db.categories;
-      db.storeName = typeof body.storeName === "string" && body.storeName.trim() ? body.storeName.trim() : db.storeName;
-      db.appIcon = typeof body.appIcon === "string" ? body.appIcon : null;
+      db.storeName = typeof body.storeName === "string" && body.storeName.trim() ? body.storeName.trim() : normalizeStoreName(db.storeName);
+      db.appIcon = normalizeAppIcon(body.appIcon);
       db.isStoreOpen = typeof body.isStoreOpen === "boolean" ? body.isStoreOpen : db.isStoreOpen;
       await saveDb(db);
       return sendJson(res, 200, publicCatalog(db));
@@ -328,5 +342,5 @@ createServer((req, res) => {
   if (req.url?.startsWith("/api/")) return handleApi(req, res);
   return serveStatic(req, res);
 }).listen(port, () => {
-  console.log(`QuickPick server berjalan di http://localhost:${port}`);
+  console.log(`${DEFAULT_STORE_NAME} server berjalan di http://localhost:${port}`);
 });

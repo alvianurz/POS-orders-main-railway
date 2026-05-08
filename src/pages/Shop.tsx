@@ -8,12 +8,14 @@ import type { Category } from "@/lib/types";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { hasProductImage } from "@/lib/product-image";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export default function Shop() {
-  const { products, user, categories: storeCats, isStoreOpen } = useApp();
+  const { products, user, categories: storeCats, storeName, isStoreOpen } = useApp();
   const categories: ("Semua" | Category)[] = ["Semua", ...storeCats];
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<(typeof categories)[number]>("Semua");
+  const displayName = storeName.trim() || DEFAULT_STORE_NAME;
 
   const filtered = useMemo(
     () =>
@@ -39,7 +41,7 @@ export default function Shop() {
             <div className="space-y-5 animate-slide-up">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary border border-border text-xs font-mono uppercase tracking-wider">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                {isStoreOpen ? "Tanpa antre" : "Toko sedang tutup"}
+                {isStoreOpen ? displayName : "Toko sedang tutup"}
               </div>
               <h1 className="text-5xl md:text-6xl font-display font-bold tracking-tighter leading-[0.95]">
                 Pesan dulu.<br />

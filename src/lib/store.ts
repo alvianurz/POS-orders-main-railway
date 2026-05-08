@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CartItem, Order, OrderStatus, Product, User } from "./types";
 import { catalogApi } from "@/lib/api";
+import { DEFAULT_APP_ICON, DEFAULT_STORE_NAME } from "@/lib/brand";
 import croissant from "@/assets/p-croissant.jpg";
 import coldbrew from "@/assets/p-coldbrew.jpg";
 import sourdough from "@/assets/p-sourdough.jpg";
@@ -90,8 +91,8 @@ export const useApp = create<AppState>()(
       cart: [],
       orders: [],
       user: null,
-      storeName: "QuickPick POS",
-      appIcon: null,
+      storeName: DEFAULT_STORE_NAME,
+      appIcon: DEFAULT_APP_ICON,
       isStoreOpen: true,
       notifications: [],
 
@@ -287,7 +288,7 @@ export const useApp = create<AppState>()(
         set({ notifications: get().notifications.map((n) => ({ ...n, read: true })) }),
 
       setStoreName: (name) => {
-        const storeName = name.trim() || "QuickPick POS";
+        const storeName = name.trim() || DEFAULT_STORE_NAME;
         set({ storeName });
         void catalogApi.save({
           products: get().products,

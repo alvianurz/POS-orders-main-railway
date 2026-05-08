@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import Header from "@/components/Header";
 import PageHeader from "@/components/PageHeader";
 import { useApp } from "@/lib/store";
+import { DEFAULT_APP_ICON, DEFAULT_STORE_NAME } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +21,7 @@ export default function AdminSettings() {
   } = useApp();
   const [nameDraft, setNameDraft] = useState(storeName);
 
-  const title = useMemo(() => nameDraft.trim() || "QuickPick POS", [nameDraft]);
+  const title = useMemo(() => nameDraft.trim() || DEFAULT_STORE_NAME, [nameDraft]);
 
   const saveStoreName = () => {
     setStoreName(nameDraft);
@@ -77,9 +78,9 @@ export default function AdminSettings() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="h-16 w-16 rounded-xl border border-border/60 bg-secondary overflow-hidden grid place-items-center shrink-0">
                   {appIcon ? (
-                    <img src={appIcon} alt="Ikon app" className="h-full w-full object-cover" />
+                    <img src={appIcon || DEFAULT_APP_ICON} alt="Ikon app" className="h-full w-full object-cover" />
                   ) : (
-                    <ImageUp className="h-6 w-6 text-muted-foreground" />
+                    <img src={DEFAULT_APP_ICON} alt="Ikon app" className="h-full w-full object-cover" />
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
