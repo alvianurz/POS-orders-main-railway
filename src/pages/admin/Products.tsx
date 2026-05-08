@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import Header from "@/components/Header";
 import PageHeader from "@/components/PageHeader";
 import { useApp, formatMoney } from "@/lib/store";
+import { catalogApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -124,10 +125,13 @@ export default function AdminProducts() {
         return;
       }
 
-      const categorySet = new Set(categories.map((category) => category.toLowerCase()));
+      const current = useApp.getState();
+      const productsById = new Map(current.products.map((product) => [product.id, product]));
+      const nextCategories = [...current.categories];
+      const categorySet = new Set(nextCategories.map((category) => category.toLowerCase()));
       let importedCount = 0;
 
-      for (const row of rows.slice(1)) {
+      for (const [index, row] of rows.slice(1).entries()) {
         if (row.every((cell) => cell.trim() === "")) continue;
 
         const record = Object.fromEntries(headers.map((header, index) => [header, row[index]?.trim() ?? ""]));
@@ -141,12 +145,12 @@ export default function AdminProducts() {
         }
 
         if (!categorySet.has(category.toLowerCase())) {
-          addCategory(category);
+          nextCategories.push(category);
           categorySet.add(category.toLowerCase());
         }
 
         const nextProduct: Product = {
-          id: record.id || `p_${Date.now().toString(36)}_${importedCount}`,
+          id: record.id || `p_${Date.now().toString(36)}_${index}`,
           name,
           category,
           price,
@@ -155,7 +159,7 @@ export default function AdminProducts() {
           image: record.image || "",
         };
 
-        upsertProduct(nextProduct);
+        productsById.set(nextProduct.id, nextProduct);
         importedCount += 1;
       }
 
@@ -164,11 +168,19 @@ export default function AdminProducts() {
         return;
       }
 
+      const saved = await catalogApi.save({
+        products: [...productsById.values()],
+        categories: nextCategories,
+        storeName: current.storeName,
+        appIcon: current.appIcon,
+        isStoreOpen: current.isStoreOpen,
+      });
+      useApp.getState().hydrateCatalog(saved);
       setImportFile(null);
       setImportOpen(false);
       toast.success(`${importedCount} produk berhasil diimpor`);
     } catch {
-      toast.error("File CSV tidak dapat dibaca");
+      toast.error("CSV berhasil dibaca, tetapi gagal disimpan ke server");
     }
   };
 
