@@ -7,7 +7,6 @@ import { Search, Sparkles } from "lucide-react";
 import type { Category } from "@/lib/types";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { hasProductImage } from "@/lib/product-image";
 import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export default function Shop() {
@@ -37,7 +36,7 @@ export default function Shop() {
             <div className="absolute top-0 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/20 blur-[140px]" />
             <div className="absolute bottom-0 right-0 h-[400px] w-[400px] rounded-full bg-accent/20 blur-[140px]" />
           </div>
-          <div className="container py-14 md:py-20 grid md:grid-cols-2 gap-10 items-center">
+          <div className="container py-14 md:py-20 grid gap-10 items-center md:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)]">
             <div className="space-y-5 animate-slide-up">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary border border-border text-xs font-mono uppercase tracking-wider">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
@@ -64,12 +63,15 @@ export default function Shop() {
                 </div>
               )}
             </div>
-            <div className="hidden md:grid grid-cols-2 gap-4 animate-slide-up">
-              {products.filter(hasProductImage).slice(0, 4).map((p) => (
-                <div key={p.id} className="surface-card rounded-2xl overflow-hidden border border-border/60 aspect-square">
-                  <img src={p.image} alt={p.name} className="h-full w-full object-cover" loading="lazy" width={512} height={512} />
-                </div>
-              ))}
+            <div className="relative mx-auto w-full max-w-[560px] animate-slide-up">
+              <img
+                src="/brand/illustration.svg"
+                alt=""
+                className="h-auto w-full object-contain"
+                width={1080}
+                height={718}
+                loading="eager"
+              />
             </div>
           </div>
         </section>
