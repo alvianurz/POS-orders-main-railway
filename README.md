@@ -43,7 +43,22 @@ npm run build
 NODE_ENV=production ADMIN_EMAIL=... ADMIN_PASSWORD=... npm start
 ```
 
-Folder `.data` berisi database auth lokal dan harus disimpan di storage persisten pada server production. Jangan commit folder `.data` atau file `.env`.
+Secara default aplikasi memakai file lokal `.data/auth.json`. Jika environment `DATABASE_URL` tersedia, aplikasi otomatis memakai PostgreSQL dan file JSON hanya menjadi fallback/migration source. Jangan commit folder `.data` atau file `.env`.
+
+## PostgreSQL
+
+Untuk Railway production, disarankan memakai PostgreSQL:
+
+1. Tambahkan service PostgreSQL di project Railway yang sama.
+2. Pastikan variable `DATABASE_URL` tersedia di service aplikasi.
+3. Deploy ulang aplikasi.
+
+Saat pertama kali berjalan dengan PostgreSQL kosong, aplikasi akan membuat tabel berikut otomatis:
+
+- `users`
+- `app_state`
+
+Jika file lama `.data/auth.json` masih tersedia dan tabel PostgreSQL masih kosong, data lama akan dimigrasikan otomatis ke PostgreSQL. Setelah migrasi berhasil, data berikutnya disimpan di PostgreSQL.
 
 ## Docker Deploy
 
@@ -71,17 +86,18 @@ Setelah import repo:
    ADMIN_EMAIL=admin@domainmu.com
    ADMIN_PASSWORD=password-admin-kuat
    ```
-3. Tambahkan volume dan mount ke:
+3. Untuk penyimpanan utama, tambahkan PostgreSQL service agar `DATABASE_URL` otomatis tersedia.
+4. Opsional fallback/migrasi: tambahkan volume dan mount ke:
    ```text
    /app/.data
    ```
-4. Set healthcheck path ke:
+5. Set healthcheck path ke:
    ```text
    /health
    ```
-5. Deploy dan buka domain Railway yang dibuat otomatis.
+6. Deploy dan buka domain Railway yang dibuat otomatis.
 
-Kalau volume dipasang di path lain, set `DATA_DIR` ke path mount volume itu.
+Kalau tidak memakai PostgreSQL, volume wajib ada supaya file `.data/auth.json` tetap persisten. Kalau volume dipasang di path lain, set `DATA_DIR` ke path mount volume itu.
 
 ## Quality Check
 

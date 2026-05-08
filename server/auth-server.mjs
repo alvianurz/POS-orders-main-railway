@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, extname } from "node:path";
 import { randomBytes, pbkdf2Sync, timingSafeEqual } from "node:crypto";
+import pg from "pg";
 
 const port = Number(process.env.PORT || 8787);
 const rootDir = process.cwd();
@@ -10,6 +11,14 @@ const dataDir = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH ||
 const dbPath = join(dataDir, "auth.json");
 const distDir = join(rootDir, "dist");
 const sessions = new Map();
+const databaseUrl = process.env.DATABASE_URL;
+const pool = databaseUrl
+  ? new pg.Pool({
+      connectionString: databaseUrl,
+      ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false },
+    })
+  : null;
+let postgresReady = false;
 const DEFAULT_STORE_NAME = "Toko Ar-Rahmah";
 const DEFAULT_APP_ICON = "/brand/logo.png";
 const LEGACY_STORE_NAME = "QuickPick POS";
@@ -62,6 +71,17 @@ const emptyDb = () => ({
   isStoreOpen: true,
 });
 
+const normalizeDb = (db) => {
+  const normalized = db && typeof db === "object" ? { ...db } : emptyDb();
+  if (!Array.isArray(normalized.users)) normalized.users = [];
+  if (!Array.isArray(normalized.products)) normalized.products = [];
+  if (!Array.isArray(normalized.categories)) normalized.categories = [];
+  normalized.storeName = normalizeStoreName(normalized.storeName);
+  normalized.appIcon = normalizeAppIcon(normalized.appIcon);
+  if (typeof normalized.isStoreOpen !== "boolean") normalized.isStoreOpen = true;
+  return normalized;
+};
+
 const hashPassword = (password) => {
   const salt = randomBytes(16).toString("hex");
   const hash = pbkdf2Sync(password, salt, 210000, 32, "sha256").toString("hex");
@@ -76,7 +96,7 @@ const verifyPassword = (password, stored) => {
   return expected.length === attempt.length && timingSafeEqual(expected, attempt);
 };
 
-const loadDb = async () => {
+const loadFileDb = async () => {
   await mkdir(dataDir, { recursive: true });
   if (!existsSync(dbPath)) {
     const initial = emptyDb();
@@ -144,16 +164,151 @@ const loadDb = async () => {
       passwordHash: hashPassword(adminPassword),
       createdAt: Date.now(),
     });
-    await saveDb(db);
+    await saveFileDb(db);
     normalized = false;
   }
-  if (normalized) await saveDb(db);
+  if (normalized) await saveFileDb(db);
   return db;
 };
 
-const saveDb = async (db) => {
+const saveFileDb = async (db) => {
   await mkdir(dataDir, { recursive: true });
-  await writeFile(dbPath, JSON.stringify(db, null, 2));
+  await writeFile(dbPath, JSON.stringify(normalizeDb(db), null, 2));
+};
+
+const readLegacyFileDb = async () => {
+  if (!existsSync(dbPath)) return null;
+  try {
+    const parsed = JSON.parse(await readFile(dbPath, "utf8"));
+    return normalizeDb(parsed);
+  } catch {
+    return null;
+  }
+};
+
+const ensurePostgres = async () => {
+  if (!pool || postgresReady) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id text PRIMARY KEY,
+      name text NOT NULL,
+      email text NOT NULL UNIQUE,
+      phone text NOT NULL DEFAULT '',
+      role text NOT NULL CHECK (role IN ('admin', 'customer')),
+      password_hash text NOT NULL,
+      created_at bigint NOT NULL
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_state (
+      key text PRIMARY KEY,
+      value jsonb NOT NULL
+    );
+  `);
+  postgresReady = true;
+
+  const existingState = await pool.query("SELECT value FROM app_state WHERE key = 'catalog'");
+  const existingUsers = await pool.query("SELECT COUNT(*)::int AS count FROM users");
+  const legacy = await readLegacyFileDb();
+  if (legacy && existingState.rowCount === 0 && existingUsers.rows[0]?.count === 0) {
+    await savePostgresDb(legacy);
+  } else if (existingState.rowCount === 0) {
+    await pool.query(
+      "INSERT INTO app_state (key, value) VALUES ('catalog', $1::jsonb) ON CONFLICT (key) DO NOTHING",
+      [JSON.stringify(publicCatalog(emptyDb()))]
+    );
+  }
+};
+
+const loadPostgresDb = async () => {
+  await ensurePostgres();
+  const [usersResult, stateResult] = await Promise.all([
+    pool.query("SELECT id, name, email, phone, role, password_hash, created_at FROM users ORDER BY created_at ASC"),
+    pool.query("SELECT value FROM app_state WHERE key = 'catalog'"),
+  ]);
+  const catalog = stateResult.rows[0]?.value ?? publicCatalog(emptyDb());
+  return normalizeDb({
+    ...catalog,
+    users: usersResult.rows.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      passwordHash: user.password_hash,
+      createdAt: Number(user.created_at),
+    })),
+  });
+};
+
+const savePostgresDb = async (db) => {
+  await ensurePostgres();
+  const normalized = normalizeDb(db);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const user of normalized.users) {
+      await client.query(
+        `INSERT INTO users (id, name, email, phone, role, password_hash, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (id) DO UPDATE SET
+           name = EXCLUDED.name,
+           email = EXCLUDED.email,
+           phone = EXCLUDED.phone,
+           role = EXCLUDED.role,
+           password_hash = EXCLUDED.password_hash,
+           created_at = EXCLUDED.created_at`,
+        [user.id, user.name, user.email, user.phone ?? "", user.role, user.passwordHash, user.createdAt ?? Date.now()]
+      );
+    }
+    await client.query(
+      "DELETE FROM users WHERE NOT (id = ANY($1::text[]))",
+      [normalized.users.map((user) => user.id)]
+    );
+    await client.query(
+      `INSERT INTO app_state (key, value)
+       VALUES ('catalog', $1::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [JSON.stringify(publicCatalog(normalized))]
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const ensureAdminUser = async (db) => {
+  const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminEmail || !adminPassword || db.users.some((user) => user.email === adminEmail)) return db;
+  const nextDb = normalizeDb(db);
+  nextDb.users.push({
+    id: `u_${randomBytes(8).toString("hex")}`,
+    name: "Admin",
+    email: adminEmail,
+    phone: "",
+    role: "admin",
+    passwordHash: hashPassword(adminPassword),
+    createdAt: Date.now(),
+  });
+  await saveDb(nextDb);
+  return nextDb;
+};
+
+const loadDb = async () => {
+  const db = pool ? await loadPostgresDb() : await loadFileDb();
+  return ensureAdminUser(db);
+};
+
+const saveDb = async (db) => {
+  if (pool) {
+    await savePostgresDb(db);
+    return;
+  }
+  await saveFileDb(db);
 };
 
 const readBody = async (req) => {
