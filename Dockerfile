@@ -12,9 +12,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8787
 
+COPY package*.json ./
+RUN npm ci --omit=dev
+
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
-COPY --from=build /app/package.json ./package.json
 
 EXPOSE 8787
 CMD ["node", "server/auth-server.mjs"]
