@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import Header from "@/components/Header";
+import { AdminLayout } from "@/components/AdminLayout";
 import PageHeader from "@/components/PageHeader";
 import { useApp, formatMoney } from "@/lib/store";
 import StatusBadge from "@/components/StatusBadge";
@@ -63,9 +63,8 @@ export default function AdminOrders() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 container py-6 sm:py-10 space-y-6">
+    <AdminLayout>
+      <main className="container py-6 sm:py-10 space-y-6">
         <PageHeader
           title="Pesanan aktif"
           subtitle={`${orders.length} total · ${orders.filter(o => o.status === "Pending").length} menunggu`}
@@ -181,6 +180,6 @@ export default function AdminOrders() {
           </SheetContent>
         </Sheet>
       </main>
-    </div>
+    </AdminLayout>
   );
 }

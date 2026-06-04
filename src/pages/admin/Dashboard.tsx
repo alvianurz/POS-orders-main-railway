@@ -1,7 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import Header from "@/components/Header";
+import { AdminLayout } from "@/components/AdminLayout";
 import PageHeader from "@/components/PageHeader";
+import { AnalyticsFilters } from "@/components/AnalyticsFilters";
+import type { AnalyticsFilters as FilterType } from "@/components/AnalyticsFilters";
 import StatusBadge from "@/components/StatusBadge";
 import { useApp, formatMoney } from "@/lib/store";
 import { hasProductImage } from "@/lib/product-image";
@@ -31,6 +33,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { subDays, startOfDay, endOfDay } from "date-fns";
 
 const PIE_COLORS = [
   "hsl(var(--primary))",
@@ -55,8 +58,47 @@ const chartTooltipStyle = {
   fontSize: 12,
 };
 
+// Default 7 days filter
+const defaultFilters: FilterType = {
+  dateRange: {
+    start: startOfDay(subDays(new Date(), 6)),
+    end: endOfDay(new Date()),
+  },
+  preset: "7days",
+  categories: [],
+  products: [],
+};
+
 export default function AdminDashboard() {
-  const { orders, products } = useApp();
+  const { orders, products, categories } = useApp();
+  const [filters, setFilters] = useState<FilterType>(defaultFilters);
+
+  // Filter orders based on analytics filters
+  const filteredOrders = useMemo(() => {
+    const start = filters.dateRange.start.getTime();
+    const end = filters.dateRange.end.getTime();
+
+    let result = orders.filter((o) => o.createdAt >= start && o.createdAt <= end);
+
+    // Filter by category
+    if (filters.categories.length > 0) {
+      result = result.filter((order) => {
+        return order.items.some((item) => {
+          const product = products.find((p) => p.id === item.productId);
+          return product && filters.categories.includes(product.category);
+        });
+      });
+    }
+
+    // Filter by product
+    if (filters.products.length > 0) {
+      result = result.filter((order) => {
+        return order.items.some((item) => filters.products.includes(item.productId));
+      });
+    }
+
+    return result;
+  }, [orders, filters, products]);
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -69,24 +111,24 @@ export default function AdminDashboard() {
     const month = new Date(today);
     month.setDate(month.getDate() - 29);
 
-    const todayOrders = orders.filter((o) => o.createdAt >= today.getTime());
-    const yesterdayOrders = orders.filter((o) => o.createdAt >= yesterday.getTime() && o.createdAt < today.getTime());
-    const weekOrders = orders.filter((o) => o.createdAt >= week.getTime());
-    const monthOrders = orders.filter((o) => o.createdAt >= month.getTime());
-    const paidOrders = orders.filter((o) => o.paid);
-    const openOrders = orders.filter((o) => o.status !== "Completed");
+    const todayOrders = filteredOrders.filter((o) => o.createdAt >= today.getTime());
+    const yesterdayOrders = filteredOrders.filter((o) => o.createdAt >= yesterday.getTime() && o.createdAt < today.getTime());
+    const weekOrders = filteredOrders.filter((o) => o.createdAt >= week.getTime());
+    const monthOrders = filteredOrders.filter((o) => o.createdAt >= month.getTime());
+    const paidOrders = filteredOrders.filter((o) => o.paid);
+    const openOrders = filteredOrders.filter((o) => o.status !== "Completed");
 
-    const revenue = orders.reduce((s, o) => s + o.total, 0);
+    const revenue = filteredOrders.reduce((s, o) => s + o.total, 0);
     const revenueToday = todayOrders.reduce((s, o) => s + o.total, 0);
     const revenueYesterday = yesterdayOrders.reduce((s, o) => s + o.total, 0);
     const revenueWeek = weekOrders.reduce((s, o) => s + o.total, 0);
     const revenueMonth = monthOrders.reduce((s, o) => s + o.total, 0);
-    const unitsSold = orders.reduce((s, o) => s + o.items.reduce((n, i) => n + i.quantity, 0), 0);
-    const avgOrder = orders.length ? revenue / orders.length : 0;
-    const avgItems = orders.length ? unitsSold / orders.length : 0;
+    const unitsSold = filteredOrders.reduce((s, o) => s + o.items.reduce((n, i) => n + i.quantity, 0), 0);
+    const avgOrder = filteredOrders.length ? revenue / filteredOrders.length : 0;
+    const avgItems = filteredOrders.length ? unitsSold / filteredOrders.length : 0;
     const stockValue = products.reduce((s, p) => s + p.price * p.stock, 0);
-    const completedRate = orders.length ? (orders.filter((o) => o.status === "Completed").length / orders.length) * 100 : 0;
-    const paymentRate = orders.length ? (paidOrders.length / orders.length) * 100 : 0;
+    const completedRate = filteredOrders.length ? (filteredOrders.filter((o) => o.status === "Completed").length / filteredOrders.length) * 100 : 0;
+    const paymentRate = filteredOrders.length ? (paidOrders.length / filteredOrders.length) * 100 : 0;
     const revenueChange = revenueYesterday ? ((revenueToday - revenueYesterday) / revenueYesterday) * 100 : revenueToday ? 100 : 0;
 
     const productMap: Record<string, { name: string; qty: number; revenue: number }> = {};
@@ -99,7 +141,7 @@ export default function AdminDashboard() {
       Completed: 0,
     };
 
-    orders.forEach((order) => {
+    filteredOrders.forEach((order) => {
       statusMap[order.status] += 1;
       const customerKey = order.customerEmail;
       customerMap[customerKey] = customerMap[customerKey] || {
@@ -121,15 +163,17 @@ export default function AdminDashboard() {
       });
     });
 
+    // Daily chart based on filter range
+    const daysCount = Math.min(7, Math.ceil((filters.dateRange.end.getTime() - filters.dateRange.start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
     const daily = [];
-    for (let i = 6; i >= 0; i--) {
-      const day = new Date(today);
+    for (let i = daysCount - 1; i >= 0; i--) {
+      const day = new Date(filters.dateRange.end);
       day.setDate(day.getDate() - i);
       const next = new Date(day);
       next.setDate(next.getDate() + 1);
-      const dayOrders = orders.filter((o) => o.createdAt >= day.getTime() && o.createdAt < next.getTime());
+      const dayOrders = filteredOrders.filter((o) => o.createdAt >= day.getTime() && o.createdAt < next.getTime());
       daily.push({
-        hari: day.toLocaleDateString("id-ID", { weekday: "short" }),
+        hari: day.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" }),
         pendapatan: dayOrders.reduce((s, o) => s + o.total, 0),
         pesanan: dayOrders.length,
       });
@@ -140,7 +184,7 @@ export default function AdminDashboard() {
       const end = start + 1;
       return {
         jam: `${String(start).padStart(2, "0")}-${String(end).padStart(2, "0")}`,
-        pesanan: orders.filter((o) => {
+        pesanan: filteredOrders.filter((o) => {
           const hour = new Date(o.createdAt).getHours();
           return hour >= start && hour <= end;
         }).length,
@@ -159,7 +203,7 @@ export default function AdminDashboard() {
       openOrders,
       paymentRate,
       paidOrders: paidOrders.length,
-      recentOrders: orders.slice(0, 5),
+      recentOrders: [...filteredOrders].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5),
       revenue,
       revenueChange,
       revenueMonth,
@@ -174,18 +218,25 @@ export default function AdminDashboard() {
       topProducts: Object.values(productMap).sort((a, b) => b.revenue - a.revenue).slice(0, 6),
       unitsSold,
     };
-  }, [orders, products]);
+  }, [filteredOrders, products, filters]);
 
-  const hasOrders = orders.length > 0;
+  const hasOrders = filteredOrders.length > 0;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 container py-6 sm:py-10 space-y-6 sm:space-y-8">
+    <AdminLayout>
+      <main className="container py-6 sm:py-10 space-y-6 sm:space-y-8">
         <PageHeader
           title="Analitik toko"
-          subtitle="Ringkasan penjualan, stok, pelanggan, dan performa operasional."
+          subtitle={`${filteredOrders.length} pesanan · ${formatMoney(stats.revenue)} pendapatan dalam periode ini`}
           backTo="/"
+        />
+
+        {/* Analytics Filters */}
+        <AnalyticsFilters
+          categories={categories}
+          products={products}
+          onFiltersChange={setFilters}
+          initialFilters={defaultFilters}
         />
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
@@ -202,7 +253,7 @@ export default function AdminDashboard() {
         <div className="grid xl:grid-cols-3 gap-4 sm:gap-6">
           <Panel className="xl:col-span-2">
             <div className="flex items-center justify-between mb-4 gap-2">
-              <h2 className="font-display font-bold text-base sm:text-lg">Pendapatan & pesanan 7 hari</h2>
+              <h2 className="font-display font-bold text-base sm:text-lg">Pendapatan & pesanan</h2>
               <span className="hidden sm:inline text-xs font-mono text-muted-foreground">{formatMoney(stats.revenueWeek)}</span>
             </div>
             <div className="h-64">
@@ -360,7 +411,7 @@ export default function AdminDashboard() {
           )}
         </Panel>
       </main>
-    </div>
+    </AdminLayout>
   );
 }
 

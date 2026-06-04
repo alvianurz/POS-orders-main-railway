@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import Header from "@/components/Header";
+import { useTheme } from "next-themes";
+import { AdminLayout } from "@/components/AdminLayout";
 import PageHeader from "@/components/PageHeader";
 import { useApp } from "@/lib/store";
 import { DEFAULT_APP_ICON, DEFAULT_STORE_NAME } from "@/lib/brand";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ImageUp, Store, Trash2 } from "lucide-react";
+import { ImageUp, Store, Trash2, Sun, Moon, Monitor } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminSettings() {
@@ -19,6 +20,7 @@ export default function AdminSettings() {
     setAppIcon,
     setStoreOpen,
   } = useApp();
+  const { theme, setTheme } = useTheme();
   const [nameDraft, setNameDraft] = useState(storeName);
 
   const title = useMemo(() => nameDraft.trim() || DEFAULT_STORE_NAME, [nameDraft]);
@@ -42,16 +44,22 @@ export default function AdminSettings() {
     reader.readAsDataURL(file);
   };
 
+  const themeOptions = [
+    { value: "light", label: "Terang", icon: Sun },
+    { value: "dark", label: "Gelap", icon: Moon },
+    { value: "system", label: "Otomatis", icon: Monitor },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 container py-6 sm:py-10 space-y-6">
+    <AdminLayout>
+      <main className="container py-6 sm:py-10 space-y-6">
         <PageHeader
           title="Pengaturan"
-          subtitle="Atur nama toko, foto ikon app, dan status buka tutup toko."
+          subtitle="Atur nama toko, foto ikon app, tema, dan status buka tutup toko."
           backTo="/admin"
         />
         <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          {/* Store Identity */}
           <section className="surface-card border border-border/60 rounded-2xl p-4 sm:p-6 space-y-6">
             <div className="flex items-center gap-2">
               <Store className="h-5 w-5 text-primary" />
@@ -115,7 +123,38 @@ export default function AdminSettings() {
             </div>
           </section>
 
+          {/* Theme & Store Status */}
           <section className="surface-card border border-border/60 rounded-2xl p-4 sm:p-6 space-y-6">
+            {/* Theme Selection */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                {theme === "dark" ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-primary" />}
+                <h2 className="font-display font-bold text-base sm:text-lg">Tampilan</h2>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {themeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      setTheme(option.value);
+                      toast.success(`Tema diubah ke ${option.label}`);
+                    }}
+                    className={`flex flex-col items-center gap-2 rounded-xl p-4 transition-all ${
+                      theme === option.value
+                        ? "bg-primary text-primary-foreground ring-2 ring-primary/50"
+                        : "bg-secondary hover:bg-secondary/80 text-foreground"
+                    }`}
+                  >
+                    <option.icon className="h-6 w-6" />
+                    <span className="text-sm font-medium">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            {/* Store Status Toggle */}
             <div className="flex items-center gap-2">
               <Switch checked={isStoreOpen} onCheckedChange={setStoreOpen} />
               <div>
@@ -148,6 +187,6 @@ export default function AdminSettings() {
           </section>
         </div>
       </main>
-    </div>
+    </AdminLayout>
   );
 }

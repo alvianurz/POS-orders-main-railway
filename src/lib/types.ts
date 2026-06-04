@@ -37,3 +37,15 @@ export interface User {
   phone: string;
   role: "customer" | "admin";
 }
+
+export interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  totalOrders: number;
+  totalSpent: number;
+  avgOrderValue: number;
+  lastOrderAt: number | null;
+  createdAt: number;
+}

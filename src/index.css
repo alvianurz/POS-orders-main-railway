@@ -53,6 +53,57 @@
     --sidebar-border: 230 14% 16%;
     --sidebar-ring: 75 95% 58%;
   }
+
+  /* Light Mode Theme */
+  [data-theme="light"],
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 230 10% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 230 10% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 230 10% 15%;
+
+    /* Emerald green - better contrast on light backgrounds */
+    --primary: 152 55% 38%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 230 14% 95%;
+    --secondary-foreground: 230 10% 15%;
+
+    --muted: 230 10% 92%;
+    --muted-foreground: 230 8% 45%;
+
+    --accent: 24 95% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 55% 38%;
+    --warning: 38 95% 55%;
+
+    --border: 230 14% 88%;
+    --input: 230 14% 88%;
+    --ring: 152 55% 38%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(152 55% 38%), hsl(158 50% 42%));
+    --gradient-accent: linear-gradient(135deg, hsl(24 95% 55%), hsl(340 90% 55%));
+    --gradient-surface: linear-gradient(180deg, hsl(0 0% 100%), hsl(0 0% 98%));
+    --shadow-glow: 0 0 20px hsl(152 55% 38% / 0.15);
+    --shadow-card: 0 4px 16px -4px hsl(230 30% 2% / 0.08);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 230 10% 15%;
+    --sidebar-primary: 152 55% 38%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 230 10% 92%;
+    --sidebar-accent-foreground: 230 10% 15%;
+    --sidebar-border: 230 14% 88%;
+    --sidebar-ring: 152 55% 38%;
+  }
 }
 
 @layer base {

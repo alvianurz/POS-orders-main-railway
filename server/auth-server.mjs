@@ -546,6 +546,76 @@ const handleApi = async (req, res) => {
       return sendJson(res, result.status, result.payload);
     }
 
+    // Customer API endpoints
+    if (req.method === "GET" && pathname === "/api/customers") {
+      const me = await currentUser(req);
+      if (!me || me.role !== "admin") return sendJson(res, 401, { message: "Hanya admin yang dapat mengakses." });
+      const db = await loadDb();
+
+      // Aggregate customer stats from orders
+      const customerMap = {};
+      for (const order of db.orders) {
+        const email = normalizeEmail(order.customerEmail);
+        if (!customerMap[email]) {
+          customerMap[email] = {
+            id: `c_${Buffer.from(email).toString("hex").slice(0, 12)}`,
+            name: order.customerName,
+            email: email,
+            phone: order.customerPhone || "",
+            totalOrders: 0,
+            totalSpent: 0,
+            avgOrderValue: 0,
+            lastOrderAt: null,
+            createdAt: db.users.find(u => normalizeEmail(u.email) === email)?.createdAt || Date.now(),
+          };
+        }
+        customerMap[email].totalOrders += 1;
+        customerMap[email].totalSpent += order.total;
+        if (!customerMap[email].lastOrderAt || order.createdAt > customerMap[email].lastOrderAt) {
+          customerMap[email].lastOrderAt = order.createdAt;
+        }
+      }
+
+      // Calculate avg order value
+      for (const customer of Object.values(customerMap)) {
+        customer.avgOrderValue = customer.totalOrders > 0
+          ? Math.round(customer.totalSpent / customer.totalOrders)
+          : 0;
+      }
+
+      const customers = Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent);
+      return sendJson(res, 200, { customers });
+    }
+
+    const customerMatch = pathname.match(/^\/api\/customers\/([^/]+)$/);
+    if (req.method === "GET" && customerMatch) {
+      const me = await currentUser(req);
+      if (!me || me.role !== "admin") return sendJson(res, 401, { message: "Hanya admin yang dapat mengakses." });
+      const db = await loadDb();
+      const email = normalizeEmail(decodeURIComponent(customerMatch[1]));
+
+      // Find customer and their orders
+      const customerOrders = db.orders.filter(o => normalizeEmail(o.customerEmail) === email);
+      if (customerOrders.length === 0) {
+        return sendJson(res, 404, { message: "Pelanggan tidak ditemukan." });
+      }
+
+      const customer = {
+        id: `c_${Buffer.from(email).toString("hex").slice(0, 12)}`,
+        name: customerOrders[0].customerName,
+        email: email,
+        phone: customerOrders[0].customerPhone || "",
+        totalOrders: customerOrders.length,
+        totalSpent: customerOrders.reduce((s, o) => s + o.total, 0),
+        avgOrderValue: 0,
+        lastOrderAt: Math.max(...customerOrders.map(o => o.createdAt)),
+        createdAt: db.users.find(u => normalizeEmail(u.email) === email)?.createdAt || Date.now(),
+      };
+      customer.avgOrderValue = Math.round(customer.totalSpent / customer.totalOrders);
+
+      return sendJson(res, 200, { customer, orders: customerOrders });
+    }
+
     if (req.method === "POST" && pathname === "/api/auth/register") {
       const body = await readBody(req);
       const name = String(body.name || "").trim();

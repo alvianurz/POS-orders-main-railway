@@ -1,5 +1,5 @@
-import type { User } from "./types";
-import type { CartItem, Order, OrderStatus, Product } from "./types";
+import type { User, Customer, Order } from "./types";
+import type { CartItem, OrderStatus, Product } from "./types";
 
 export type CatalogState = {
   products: Product[];
@@ -94,4 +94,24 @@ export const orderApi = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+};
+
+async function requestCustomers<T>(path: string, options: RequestInit = {}) {
+  const response = await fetch(path, {
+    cache: "no-store",
+    credentials: "include",
+    headers: { "content-type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+  const data = (await response.json()) as T & { message?: string };
+  if (!response.ok) throw new Error(data.message || "Permintaan gagal.");
+  return data;
+}
+
+export const customerApi = {
+  list: () => requestCustomers<{ customers: Customer[] }>("/api/customers"),
+  get: (id: string) =>
+    requestCustomers<{ customer: Customer; orders: Order[] }>(
+      "/api/customers/" + encodeURIComponent(id)
+    ),
 };

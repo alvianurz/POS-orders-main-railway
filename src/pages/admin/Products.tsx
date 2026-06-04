@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import Header from "@/components/Header";
+import { AdminLayout } from "@/components/AdminLayout";
 import PageHeader from "@/components/PageHeader";
 import { useApp, formatMoney } from "@/lib/store";
 import { catalogApi } from "@/lib/api";
@@ -185,9 +185,8 @@ export default function AdminProducts() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 container py-6 sm:py-10 space-y-6">
+    <AdminLayout>
+      <main className="container py-6 sm:py-10 space-y-6">
         <PageHeader
           title="Produk & stok"
           subtitle={`${filteredProducts.length} dari ${products.length} produk · ${products.filter((p) => p.stock <= 5).length} stok rendah · ${categories.length} kategori`}
@@ -523,7 +522,7 @@ export default function AdminProducts() {
           </DialogContent>
         </Dialog>
       </main>
-    </div>
+    </AdminLayout>
   );
 }
 
