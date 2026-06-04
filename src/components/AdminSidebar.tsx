@@ -1,4 +1,5 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import {
   LayoutDashboard,
@@ -11,6 +12,7 @@ import {
   Sun,
   Moon,
   PanelLeft,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,7 +24,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useApp } from "@/lib/store";
+import { authApi } from "@/lib/api";
 import { DEFAULT_APP_ICON, DEFAULT_STORE_NAME } from "@/lib/brand";
+import { toast } from "sonner";
 
 interface NavItem {
   to: string;
@@ -45,8 +49,9 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ onToggle, isCollapsed }: AdminSidebarProps) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { appIcon, storeName } = useApp();
+  const { appIcon, storeName, signOut } = useApp();
   const iconHref = appIcon || DEFAULT_APP_ICON;
   const displayName = storeName.trim() || DEFAULT_STORE_NAME;
 
@@ -57,6 +62,17 @@ export function AdminSidebar({ onToggle, isCollapsed }: AdminSidebarProps) {
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authApi.signOut();
+      signOut();
+      toast.success("Berhasil keluar");
+      navigate("/");
+    } catch {
+      toast.error("Gagal keluar");
+    }
   };
 
   return (
@@ -199,6 +215,36 @@ export function AdminSidebar({ onToggle, isCollapsed }: AdminSidebarProps) {
             {isCollapsed && (
               <TooltipContent side="right" sideOffset={10}>
                 Perluas Sidebar
+              </TooltipContent>
+            )}
+          </Tooltip>
+
+          {/* Logout Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className={cn(
+                  "w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10",
+                  isCollapsed && "justify-center px-2"
+                )}
+              >
+                <LogOut className="h-5 w-5 shrink-0" />
+                <span
+                  className={cn(
+                    "truncate transition-all duration-200",
+                    isCollapsed && "opacity-0 w-0 absolute"
+                  )}
+                >
+                  Keluar
+                </span>
+              </Button>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right" sideOffset={10}>
+                Keluar
               </TooltipContent>
             )}
           </Tooltip>

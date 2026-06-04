@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
+import { useTheme } from "next-themes";
 import Header from "@/components/Header";
 import ProductCard from "@/components/ProductCard";
+import FloatingCartButton from "@/components/FloatingCartButton";
+import LoginPrompt, { useLoginPromptStore } from "@/components/LoginPrompt";
 import { useApp } from "@/lib/store";
 import { Input } from "@/components/ui/input";
 import { Search, Sparkles } from "lucide-react";
@@ -11,10 +14,12 @@ import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export default function Shop() {
   const { products, user, categories: storeCats, storeName, isStoreOpen } = useApp();
+  const { theme } = useTheme();
   const categories: ("Semua" | Category)[] = ["Semua", ...storeCats];
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<(typeof categories)[number]>("Semua");
   const displayName = storeName.trim() || DEFAULT_STORE_NAME;
+  const { isOpen, productName, closeLoginPrompt } = useLoginPromptStore();
 
   const filtered = useMemo(
     () =>
@@ -29,6 +34,7 @@ export default function Shop() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
+      <LoginPrompt open={isOpen} onOpenChange={closeLoginPrompt} productName={productName || undefined} />
       <main className="flex-1">
         {/* Hero */}
         <section className="relative overflow-hidden border-b border-border/60">
@@ -65,7 +71,7 @@ export default function Shop() {
             </div>
             <div className="relative mx-auto w-full max-w-[560px] animate-slide-up">
               <img
-                src="/brand/illustration.svg"
+                src={theme === "light" ? "/brand/illustration lightmode.svg" : "/brand/illustration.svg"}
                 alt=""
                 className="h-auto w-full object-contain"
                 width={1080}
@@ -123,6 +129,9 @@ export default function Shop() {
           )}
         </section>
       </main>
+
+      {/* Floating Cart Button for guest checkout reminder */}
+      <FloatingCartButton />
     </div>
   );
 }

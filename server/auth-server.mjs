@@ -12,6 +12,9 @@ const dbPath = join(dataDir, "auth.json");
 const distDir = join(rootDir, "dist");
 const sessions = new Map();
 const databaseUrl = process.env.DATABASE_URL;
+
+// SSE clients - Map<clientId, { res, userId, role }>
+const sseClients = new Map();
 const pool = databaseUrl
   ? new pg.Pool({
       connectionString: databaseUrl,
@@ -334,6 +337,21 @@ const sendJson = (res, status, payload, extraHeaders = {}) => {
   res.end(JSON.stringify(payload));
 };
 
+// SSE Broadcast - send notification to specific clients
+const broadcastNotification = (targetRole, notification) => {
+  const message = `data: ${JSON.stringify(notification)}\n\n`;
+  for (const [clientId, client] of sseClients) {
+    if (client.role === targetRole || targetRole === "all") {
+      try {
+        client.res.write(message);
+      } catch (err) {
+        console.error(`SSE write error for client ${clientId}:`, err.message);
+        sseClients.delete(clientId);
+      }
+    }
+  }
+};
+
 const getCookie = (req, name) => {
   const cookie = req.headers.cookie || "";
   const found = cookie
@@ -441,6 +459,19 @@ const createOrder = async (user, body) => {
   });
   db.orders = [order, ...sortOrders(db.orders)];
   await saveDb(db);
+
+  // Broadcast new order notification to all admins
+  broadcastNotification("admin", {
+    type: "new_order",
+    order: {
+      id: order.id,
+      pickupId: order.pickupId,
+      customerName: order.customerName,
+      total: order.total,
+      itemCount: orderItems.length,
+    },
+  });
+
   return { status: 201, payload: { order, catalog: publicCatalog(db) } };
 };
 
@@ -456,6 +487,7 @@ const updateOrder = async (user, orderId, body) => {
   }
 
   const validStatuses = new Set(["Pending", "Preparing", "Ready", "Completed"]);
+  const previousStatus = order.status;
   if (typeof body.status !== "undefined") {
     if (!validStatuses.has(body.status)) {
       return { status: 400, payload: { message: "Status pesanan tidak valid." } };
@@ -468,6 +500,17 @@ const updateOrder = async (user, orderId, body) => {
   }
 
   await saveDb(db);
+
+  // Broadcast status update to the specific customer
+  broadcastNotification("customer", {
+    type: "order_update",
+    orderId: order.id,
+    pickupId: order.pickupId,
+    customerEmail: order.customerEmail,
+    status: order.status,
+    previousStatus: previousStatus,
+  });
+
   return { status: 200, payload: { order } };
 };
 
@@ -685,8 +728,9 @@ const contentType = {
 
 const serveStatic = async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const requested = url.pathname === "/" ? "/index.html" : url.pathname;
-  const filePath = join(distDir, requested);
+  // Decode URL-encoded characters (e.g., %20 -> space)
+  const requestedPath = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
+  const filePath = join(distDir, requestedPath);
   const safePath = filePath.startsWith(distDir) ? filePath : join(distDir, "index.html");
   const finalPath = existsSync(safePath) ? safePath : join(distDir, "index.html");
   try {
@@ -704,9 +748,61 @@ const serveStatic = async (req, res) => {
   }
 };
 
-createServer((req, res) => {
-  if (req.url === "/health") return handleApi(req, res);
+createServer(async (req, res) => {
+  // Health check
+  if (req.url === "/health") {
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("ok");
+    return;
+  }
+
+  // SSE endpoint for real-time notifications (must be before /api/ check)
+  if (req.url === "/api/notifications/stream") {
+    const user = await currentUser(req);
+    if (!user) {
+      res.writeHead(401, { "content-type": "application/json" });
+      res.end(JSON.stringify({ message: "Unauthorized" }));
+      return;
+    }
+
+    // Set SSE headers
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+    });
+
+    // Send initial connection message
+    res.write(`data: ${JSON.stringify({ type: "connected", role: user.role })}\n\n`);
+
+    // Register client
+    const clientId = randomBytes(16).toString("hex");
+    sseClients.set(clientId, { res, userId: user.id, role: user.role });
+
+    // Heartbeat every 30 seconds to keep connection alive
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: heartbeat\n\n`);
+      } catch {
+        clearInterval(heartbeat);
+        sseClients.delete(clientId);
+      }
+    }, 30000);
+
+    // Cleanup on disconnect
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      sseClients.delete(clientId);
+    });
+
+    return;
+  }
+
+  // API endpoints
   if (req.url?.startsWith("/api/")) return handleApi(req, res);
+
+  // Static files
   return serveStatic(req, res);
 }).listen(port, () => {
   console.log(`${DEFAULT_STORE_NAME} server berjalan di http://localhost:${port}`);

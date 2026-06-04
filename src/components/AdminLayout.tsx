@@ -1,6 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { AdminSidebar, MobileSidebarTrigger } from "./AdminSidebar";
 import { MobileAdminSidebar } from "./MobileAdminSidebar";
+import { NotificationBell } from "./NotificationBell";
 import { cn } from "@/lib/utils";
 
 interface AdminLayoutProps {
@@ -56,9 +57,12 @@ export function AdminLayout({ children, className }: AdminLayoutProps) {
         {/* Mobile Header with hamburger */}
         {isMobile && (
           <header className="sticky top-0 z-40 border-b border-border/70 bg-background/92 backdrop-blur-xl">
-            <div className="flex h-14 items-center gap-2 px-4">
-              <MobileSidebarTrigger onClick={() => setIsMobileOpen(true)} />
-              <span className="font-display font-bold text-sm">Admin Dashboard</span>
+            <div className="flex h-14 items-center justify-between gap-2 px-4">
+              <div className="flex items-center gap-2">
+                <MobileSidebarTrigger onClick={() => setIsMobileOpen(true)} />
+                <span className="font-display font-bold text-sm">Admin Dashboard</span>
+              </div>
+              <NotificationBell />
             </div>
           </header>
         )}

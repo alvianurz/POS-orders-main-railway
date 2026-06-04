@@ -151,6 +151,7 @@ export default function AdminSettings() {
                         : "bg-secondary hover:bg-secondary/80 text-foreground"
                     }`}
                   >
+                    {typeof option.icon === "function" ? <option.icon /> : <option.icon className="h-6 w-6" />}
                     <span className="text-sm font-medium">{option.label}</span>
                   </button>
                 ))}

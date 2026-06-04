@@ -20,6 +20,7 @@ import CustomerDetail from "./pages/admin/CustomerDetail.tsx";
 import { RequireAuth } from "./components/RequireAuth.tsx";
 import { authApi, catalogApi, orderApi } from "./lib/api.ts";
 import { useApp } from "./lib/store.ts";
+import { useNotifications } from "./hooks/useNotifications.tsx";
 
 const queryClient = new QueryClient();
 
@@ -85,6 +86,9 @@ const App = () => {
       window.clearInterval(timer);
     };
   }, [setUser]);
+
+  // Connect to SSE for real-time notifications
+  useNotifications();
 
   if (!sessionChecked) {
     return (

@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import {
   LayoutDashboard,
@@ -9,6 +8,7 @@ import {
   Settings2,
   Sun,
   Moon,
+  LogOut,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -19,10 +19,11 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetClose,
 } from "@/components/ui/sheet";
 import { useApp } from "@/lib/store";
+import { authApi } from "@/lib/api";
 import { DEFAULT_APP_ICON, DEFAULT_STORE_NAME } from "@/lib/brand";
+import { toast } from "sonner";
 
 interface NavItem {
   to: string;
@@ -45,8 +46,9 @@ interface MobileAdminSidebarProps {
 
 export function MobileAdminSidebar({ open, onClose }: MobileAdminSidebarProps) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { appIcon, storeName } = useApp();
+  const { appIcon, storeName, signOut } = useApp();
   const iconHref = appIcon || DEFAULT_APP_ICON;
   const displayName = storeName.trim() || DEFAULT_STORE_NAME;
 
@@ -55,9 +57,20 @@ export function MobileAdminSidebar({ open, onClose }: MobileAdminSidebarProps) {
     onClose();
   };
 
+  const handleLogout = async () => {
+    try {
+      await authApi.signOut();
+      signOut();
+      toast.success("Berhasil keluar");
+      navigate("/");
+    } catch {
+      toast.error("Gagal keluar");
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent side="left" className="w-72 p-0 flex flex-col">
+      <SheetContent side="left" className="w-72 p-0 flex flex-col" showClose={false}>
         <SheetHeader className="border-b border-border px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -68,11 +81,13 @@ export function MobileAdminSidebar({ open, onClose }: MobileAdminSidebarProps) {
                 {displayName}
               </SheetTitle>
             </div>
-            <SheetClose asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <X className="h-4 w-4" />
-              </Button>
-            </SheetClose>
+            <button
+              onClick={onClose}
+              className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
+              aria-label="Tutup menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
         </SheetHeader>
 
@@ -120,6 +135,16 @@ export function MobileAdminSidebar({ open, onClose }: MobileAdminSidebarProps) {
               <Moon className="h-5 w-5 shrink-0" />
             )}
             <span>{theme === "dark" ? "Mode Terang" : "Mode Gelap"}</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive"
+          >
+            <LogOut className="h-5 w-5 shrink-0" />
+            <span>Keluar</span>
           </Button>
         </div>
       </SheetContent>

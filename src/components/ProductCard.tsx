@@ -4,13 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Plus, Minus } from "lucide-react";
 import { formatMoney } from "@/lib/store";
 import { hasProductImage } from "@/lib/product-image";
+import { useLoginPromptStore } from "@/components/LoginPrompt";
 
 export default function ProductCard({ product }: { product: Product }) {
-  const { cart, addToCart, updateCartQty, isStoreOpen } = useApp();
+  const { cart, addToCart, updateCartQty, isStoreOpen, user } = useApp();
+  const openLoginPrompt = useLoginPromptStore((s) => s.openLoginPrompt);
   const inCart = cart.find((c) => c.productId === product.id);
   const out = product.stock === 0;
   const low = product.stock > 0 && product.stock <= 5;
   const hasImage = hasProductImage(product);
+
+  const handleAddToCart = () => {
+    if (!user) {
+      // Guest user - show login prompt
+      openLoginPrompt(product.name);
+      return;
+    }
+    addToCart(product.id);
+  };
 
   return (
     <div className={`group surface-card overflow-hidden border border-border/60 hover:border-primary/40 transition-all hover:-translate-y-0.5 ${hasImage ? "rounded-2xl" : "rounded-xl"}`}>
@@ -93,7 +104,7 @@ export default function ProductCard({ product }: { product: Product }) {
             <Button
               size="sm"
               disabled={out || !isStoreOpen}
-              onClick={() => addToCart(product.id)}
+              onClick={handleAddToCart}
               className="w-full rounded-full font-semibold px-3 sm:w-auto sm:px-4"
               aria-label={`Tambah ${product.name} ke keranjang`}
             >
