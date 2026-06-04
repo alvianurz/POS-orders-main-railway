@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ImageUp, Store, Trash2, Sun, Moon, Monitor } from "lucide-react";
+import { ImageUp, Store, Trash2, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminSettings() {
@@ -47,7 +47,13 @@ export default function AdminSettings() {
   const themeOptions = [
     { value: "light", label: "Terang", icon: Sun },
     { value: "dark", label: "Gelap", icon: Moon },
-    { value: "system", label: "Otomatis", icon: Monitor },
+    { value: "system", label: "Otomatis", icon: () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <rect width="20" height="14" x="2" y="3" rx="2" />
+        <line x1="8" x2="16" y1="21" y2="21" />
+        <line x1="12" x2="12" y1="17" y2="21" />
+      </svg>
+    ) },
   ];
 
   return (
@@ -145,7 +151,6 @@ export default function AdminSettings() {
                         : "bg-secondary hover:bg-secondary/80 text-foreground"
                     }`}
                   >
-                    <option.icon className="h-6 w-6" />
                     <span className="text-sm font-medium">{option.label}</span>
                   </button>
                 ))}

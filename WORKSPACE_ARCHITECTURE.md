@@ -13,10 +13,11 @@
 | **Frontend** | React 18 + TypeScript | SPA with Vite, TanStack Query, Zustand |
 | **Backend** | Node.js (ESM) | Custom HTTP server with REST API |
 | **Database** | JSON File / PostgreSQL | Dual persistence with automatic fallback |
-| **Styling** | Tailwind CSS + shadcn/ui | Radix UI primitives with custom theme |
+| **Styling** | Tailwind CSS + shadcn/ui | Radix UI primitives with custom dark/light theme |
 | **Charts** | Recharts | Analytics visualizations |
 | **State** | Zustand | Client-side state management with persistence |
 | **Auth** | PBKDF2 + Cookie Sessions | Server-side session management |
+| **Theming** | next-themes | Dark/light mode with system preference detection |
 
 ### Tech Stack Summary
 
@@ -515,9 +516,55 @@ Request
 ┌─────────────────────────────────────────────────────────────────┐
 │                    TanStack Query Cache                          │
 │  - Session validation on app load                                │
-│  - Catalog polling every 15 seconds                               │
+│  - Catalog polling every 15 seconds                              │
 │  - Order list updates                                           │
 └─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Theme Context (next-themes)                  │
+│  - Dark/Light/System mode detection                              │
+│  - Persisted to localStorage                                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Admin Navigation Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       AdminLayout                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Sidebar (collapsible)     │  Main Content Area        │   │
+│  │  ┌─────────────────────┐    │                            │   │
+│  │  │ Logo + Store Name   │    │  <PageHeader />            │   │
+│  │  │─────────────────────│    │  <AnalyticsFilters />      │   │
+│  │  │ 📊 Analitik         │    │  ...                       │   │
+│  │  │ 🏪 Produk           │    │                            │   │
+│  │  │ 📋 Pesanan          │    │                            │   │
+│  │  │ 👥 Pelanggan        │    │                            │   │
+│  │  │ ⚙️ Pengaturan       │    │                            │   │
+│  │  │─────────────────────│    │                            │   │
+│  │  │ 🌓 Theme Toggle     │    │                            │   │
+│  │  │ 📂 Collapse         │    │                            │   │
+│  │  └─────────────────────┘    │                            │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Customer Aggregation Pipeline
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Orders    │────►│   Group by  │────►│  Aggregate  │────►│   Return    │
+│  (from DB)  │     │   Email     │     │  (stats)   │     │  Customer[] │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+                                              │
+                                              ▼
+                                       ┌─────────────┐
+                                       │ avgOrder    │
+                                       │ totalSpent  │
+                                       │ lastOrderAt │
+                                       └─────────────┘
 ```
 
 ### Admin Analytics Pipeline

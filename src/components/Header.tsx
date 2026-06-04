@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ShoppingCart, Bell, LogOut, LayoutDashboard, Store, Receipt, HelpCircle, Settings2, type LucideIcon } from "lucide-react";
+import { useTheme } from "next-themes";
+import { ShoppingCart, Bell, LogOut, LayoutDashboard, Store, Receipt, HelpCircle, Settings2, Sun, Moon, type LucideIcon } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { DEFAULT_APP_ICON, DEFAULT_STORE_NAME } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 
 export default function Header() {
   const { user, cart, signOut, notifications, markNotificationsRead, appIcon, storeName, isStoreOpen } = useApp();
+  const { theme, setTheme } = useTheme();
   const cartCount = cart.reduce((s, c) => s + c.quantity, 0);
   const unread = notifications.filter((n) => !n.read).length;
   const { pathname } = useLocation();
@@ -75,6 +77,16 @@ export default function Header() {
         )}
 
         <div className="flex items-center gap-2">
+          {/* Theme Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
+
           <a
             href="https://wa.me/15555555555"
             target="_blank"
