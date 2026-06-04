@@ -437,6 +437,7 @@ const createOrder = async (user, body) => {
       name: product.name,
       price: Number(product.price || 0),
       quantity: item.quantity,
+      checked: false,
     });
   }
 
@@ -497,6 +498,15 @@ const updateOrder = async (user, orderId, body) => {
   if (typeof body.paid === "boolean") {
     order.paid = body.paid;
     if (body.paid) order.status = "Completed";
+  }
+  // Handle item checkboxes update
+  if (Array.isArray(body.items)) {
+    for (const updatedItem of body.items) {
+      const existingItem = order.items.find((i) => i.productId === updatedItem.productId);
+      if (existingItem) {
+        existingItem.checked = updatedItem.checked;
+      }
+    }
   }
 
   await saveDb(db);

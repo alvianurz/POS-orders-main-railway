@@ -17,13 +17,21 @@ export interface CartItem {
 
 export type OrderStatus = "Pending" | "Preparing" | "Ready" | "Completed";
 
+export interface OrderItem {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  checked?: boolean; // Tracks if item has been checked off during preparation
+}
+
 export interface Order {
   id: string;
   pickupId: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
-  items: { productId: string; name: string; price: number; quantity: number }[];
+  items: OrderItem[];
   total: number;
   status: OrderStatus;
   createdAt: number;

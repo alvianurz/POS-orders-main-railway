@@ -59,6 +59,7 @@ interface AppState {
   placeOrder: () => Promise<Order | null>;
   setOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
   markPaid: (id: string) => Promise<void>;
+  updateOrderItemChecked: (orderId: string, productId: string, checked: boolean) => Promise<void>;
 
   // products (admin)
   upsertProduct: (p: Product) => void;
@@ -179,6 +180,14 @@ export const useApp = create<AppState>()(
         const data = await orderApi.update(id, { paid: true });
         set({
           orders: get().orders.map((o) => (o.id === id ? data.order : o)),
+        });
+      },
+      updateOrderItemChecked: async (orderId, productId, checked) => {
+        const data = await orderApi.update(orderId, {
+          items: [{ productId, checked }],
+        });
+        set({
+          orders: get().orders.map((o) => (o.id === orderId ? data.order : o)),
         });
       },
 

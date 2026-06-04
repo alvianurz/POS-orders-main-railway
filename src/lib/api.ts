@@ -89,7 +89,7 @@ export const orderApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  update: (id: string, payload: { status?: OrderStatus; paid?: boolean }) =>
+  update: (id: string, payload: { status?: OrderStatus; paid?: boolean; items?: Array<{ productId: string; checked: boolean }> }) =>
     requestOrders<{ order: Order }>("/api/orders/" + encodeURIComponent(id), {
       method: "PATCH",
       body: JSON.stringify(payload),

@@ -2,10 +2,12 @@ import { useMemo, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import PageHeader from "@/components/PageHeader";
 import { useApp, formatMoney } from "@/lib/store";
+import { cn } from "@/lib/utils";
 import StatusBadge from "@/components/StatusBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronRight } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, ChevronRight, CheckCircle2, Circle } from "lucide-react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
@@ -22,7 +24,7 @@ const statusLabels: Record<OrderStatus | "All", string> = {
 };
 
 export default function AdminOrders() {
-  const { orders, setOrderStatus, markPaid } = useApp();
+  const { orders, setOrderStatus, markPaid, updateOrderItemChecked } = useApp();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"All" | OrderStatus>("All");
   const [open, setOpen] = useState<Order | null>(null);
@@ -60,6 +62,22 @@ export default function AdminOrders() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Pesanan gagal diperbarui");
     }
+  };
+
+  const toggleItemChecked = async (order: Order, productId: string, checked: boolean) => {
+    try {
+      await updateOrderItemChecked(order.id, productId, checked);
+      setOpen({
+        ...order,
+        items: order.items.map((i) => (i.productId === productId ? { ...i, checked } : i)),
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui item");
+    }
+  };
+
+  const canMarkReady = (order: Order) => {
+    return order.status === "Preparing" && order.items.every((i) => i.checked);
   };
 
   return (
@@ -141,8 +159,24 @@ export default function AdminOrders() {
                     <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">Item</div>
                     <div className="space-y-2">
                       {open.items.map((i) => (
-                        <div key={i.productId} className="flex justify-between text-sm py-2 border-b border-border/60">
-                          <span>{i.quantity}× {i.name}</span>
+                        <div key={i.productId} className="flex items-center justify-between text-sm py-2 border-b border-border/60">
+                          <div className="flex items-center gap-3">
+                            {open.status === "Preparing" ? (
+                              <Checkbox
+                                id={`item-${i.productId}`}
+                                checked={!!i.checked}
+                                onCheckedChange={(checked) => toggleItemChecked(open, i.productId, !!checked)}
+                                className="shrink-0"
+                              />
+                            ) : i.checked ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-muted-foreground shrink-0" />
+                            )}
+                            <span className={i.checked ? "line-through text-muted-foreground" : ""}>
+                              {i.quantity}× {i.name}
+                            </span>
+                          </div>
                           <span className="font-mono">{formatMoney(i.price * i.quantity)}</span>
                         </div>
                       ))}
@@ -153,20 +187,46 @@ export default function AdminOrders() {
                     </div>
                   </div>
 
+                  {open.status === "Preparing" && (
+                    <div className="bg-muted/30 rounded-xl p-4">
+                      <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
+                        Progress
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>
+                          {open.items.filter((i) => i.checked).length} / {open.items.length} item dicek
+                        </span>
+                        <span className={canMarkReady(open) ? "text-green-600 font-semibold" : "text-muted-foreground"}>
+                          {canMarkReady(open) ? "Siap ditandai" : "Centang semua item"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">Ubah status</div>
                     <div className="grid grid-cols-2 gap-2">
-                      {statuses.map((s) => (
-                        <Button
-                          key={s}
-                          variant={open.status === s ? "default" : "secondary"}
-                          onClick={() => void changeStatus(open, s)}
-                          className="font-bold"
-                        >
-                          {statusLabels[s]}
-                        </Button>
-                      ))}
+                      {statuses.map((s) => {
+                        const isDisabled = s === "Ready" && !canMarkReady(open) && open.status === "Preparing";
+                        const isReadyStatus = s === "Ready";
+                        return (
+                          <Button
+                            key={s}
+                            variant={open.status === s ? "default" : "secondary"}
+                            onClick={() => !isDisabled && void changeStatus(open, s)}
+                            className={cn("font-bold", isDisabled && "opacity-50 cursor-not-allowed")}
+                            disabled={isDisabled}
+                          >
+                            {statusLabels[s]}
+                          </Button>
+                        );
+                      })}
                     </div>
+                    {open.status === "Preparing" && !canMarkReady(open) && (
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        Centang semua item untuk bisa menandai "Siap"
+                      </p>
+                    )}
                   </div>
 
                   {!open.paid && (

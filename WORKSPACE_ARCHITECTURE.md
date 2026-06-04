@@ -55,8 +55,11 @@ POS-orders-main/
 │   ├── components/                 # Reusable UI components
 │   │   ├── ui/                     # shadcn/ui component library
 │   │   ├── AdminLayout.tsx         # Admin dashboard layout wrapper
-│   │   ├── AdminSidebar.tsx       # Desktop sidebar navigation
+│   │   ├── AdminSidebar.tsx       # Desktop sidebar navigation + logout
+│   │   ├── FloatingCartButton.tsx # Floating checkout reminder (customer)
+│   │   ├── LoginPrompt.tsx         # Guest-to-login dialog + Zustand store
 │   │   ├── MobileAdminSidebar.tsx # Mobile hamburger sidebar
+│   │   ├── NotificationBell.tsx   # Admin notification dropdown
 │   │   ├── AnalyticsFilters.tsx   # Date/category/product filters
 │   │   ├── Header.tsx              # Public header component
 │   │   ├── PageHeader.tsx          # Page title/subtitle wrapper
@@ -66,6 +69,7 @@ POS-orders-main/
 │   │   └── ThemeProvider.tsx       # Dark/light theme context
 │   ├── hooks/                      # Custom React hooks
 │   │   ├── use-mobile.tsx          # Mobile viewport detection
+│   │   ├── useNotifications.tsx    # SSE real-time notifications hook
 │   │   └── use-toast.ts            # Toast notification hook
 │   ├── lib/                        # Core utilities and services
 │   │   ├── api.ts                 # API client functions (auth, catalog, orders)
@@ -234,6 +238,7 @@ interface OrderItem {
   name: string;
   price: number;
   quantity: number;
+  checked?: boolean;               // Tracks if item prepared during "Preparing" status
 }
 ```
 
@@ -304,8 +309,8 @@ CREATE INDEX idx_users_role ON users(role);
    │ name        │       │ name        │  │
    │ email       │       │ price       │  │
    │ phone       │       │ quantity    │  │
-   │ totalOrders │       └─────────────┘  │
-   │ totalSpent  │                        │
+   │ totalOrders │       │ checked?    │  │
+   │ totalSpent  │       └─────────────┘  │
    └─────────────┘                        │
                                          │
         ┌─────────────────────────────────┘
@@ -338,6 +343,7 @@ CREATE INDEX idx_users_role ON users(role);
 | Method | Endpoint | Description | Auth Required | Request Body | Response |
 |--------|----------|-------------|---------------|--------------|----------|
 | `GET` | `/health` | Health check | No | — | `"ok"` |
+| `GET` | `/api/notifications/stream` | SSE stream for real-time notifications | Yes | — | EventStream |
 | `GET` | `/api/auth/session` | Get current session | No | — | `{ user: User \| null }` |
 | `POST` | `/api/auth/signin` | Login | No | `{ email, password }` | `{ user }` + Set-Cookie |
 | `POST` | `/api/auth/signout` | Logout | No | — | `{ ok: true }` + Clear-Cookie |
@@ -347,7 +353,7 @@ CREATE INDEX idx_users_role ON users(role);
 | `PUT` | `/api/catalog` | Update catalog | Admin only | `CatalogState` | `CatalogState` |
 | `GET` | `/api/orders` | Get user's orders | Yes | — | `{ orders: Order[] }` |
 | `POST` | `/api/orders` | Create new order | Yes | `{ items: CartItem[] }` | `{ order, catalog }` |
-| `PATCH` | `/api/orders/:id` | Update order status/payment | Admin only | `{ status?, paid? }` | `{ order }` |
+| `PATCH` | `/api/orders/:id` | Update order status/payment/items | Admin only | `{ status?, paid?, items? }` | `{ order }` |
 | `GET` | `/api/customers` | List all customers | Admin only | — | `{ customers: Customer[] }` |
 | `GET` | `/api/customers/:email` | Get customer + orders | Admin only | — | `{ customer, orders }` |
 
@@ -419,6 +425,11 @@ Request
          │
          ▼ No
 ┌──────────────────────┐
+│  Check SSE Stream    │──Yes──► Register client, send heartbeats
+└──────────────────────┘
+         │
+         ▼ No
+┌──────────────────────┐
 │  Check /api/*        │──No───► Serve static file (SPA)
 └──────────────────────┘
          │
@@ -440,7 +451,12 @@ Request
          ▼
 ┌──────────────────────┐
 │  Database Operation  │
-│  (JSON or Postgres)  │
+│  (JSON or Postgres) │
+└──────────────────────┘
+         │
+         ▼
+┌──────────────────────┐
+│  Broadcast SSE       │ (if order created/updated)
 └──────────────────────┘
          │
          ▼
@@ -449,6 +465,34 @@ Request
 │  + Cookie (if auth)  │
 └──────────────────────┘
 ```
+
+### Server-Sent Events (SSE) Architecture
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Client    │◄────│   Server    │────►│   Database  │
+│  (Browser)  │     │  (auth-server)│    │ (JSON/PG)   │
+└─────────────┘     └──────┬──────┘     └─────────────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+         ▼                 ▼                 ▼
+   ┌───────────┐    ┌───────────┐    ┌───────────┐
+   │   Admin   │    │ Customer  │    │  Clients  │
+   │ Clients   │    │ Clients   │    │  Map      │
+   │ (N)       │    │ (N)       │    │ (sseClients)
+   └───────────┘    └───────────┘    └───────────┘
+```
+
+**Notification Types:**
+- `connected` — Initial handshake, confirms role
+- `new_order` — Broadcast to all admins on new order
+- `order_update` — Broadcast to customer who owns the order
+
+**SSE Client Management:**
+- Clients stored in `Map<clientId, { res, userId, role }>`
+- Heartbeat every 30 seconds to keep connections alive
+- Auto-cleanup on client disconnect
 
 ---
 
@@ -493,6 +537,33 @@ Request
 │ (JSON/Postgres) │     │ + New Catalog   │     │ + Clear Cart    │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
+
+### Order Preparation Flow (Admin)
+
+```
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│   Pending    │───►│  Preparing   │───►│    Ready     │───►│  Completed   │
+│   (new)      │    │ (in progress)│    │  (all done) │    │  (paid)      │
+└──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
+                          │
+                          ▼
+               ┌────────────────────────┐
+               │  Item Checkboxes       │
+               │  - Show when status    │
+               │    is "Preparing"      │
+               │  - Each item can be    │
+               │    checked off         │
+               │  - Ready only enabled  │
+               │    when all checked    │
+               └────────────────────────┘
+```
+
+**Preparation Workflow:**
+1. New order arrives → status = "Pending"
+2. Admin changes to "Preparing" → checkboxes appear for each item
+3. Admin checks each item as it's prepared
+4. When all items checked → "Siap" button becomes active
+5. Admin marks "Ready" → customer notified via SSE
 
 ### Frontend State Architecture
 
@@ -734,12 +805,16 @@ npm run lint
 
 | File | Purpose |
 |------|---------|
-| `server/auth-server.mjs` | Main backend server — handles all API routes, auth, and static file serving |
+| `server/auth-server.mjs` | Main backend server — handles all API routes, auth, SSE streaming, and static file serving |
 | `server/migrate.mjs` | One-time script to migrate JSON data to PostgreSQL |
 | `server/generate-dummy-data.mjs` | Utility to generate sample orders for testing |
 | `src/lib/store.ts` | Zustand store — single source of truth for frontend state |
 | `src/lib/api.ts` | API client — all HTTP requests to backend |
-| `src/App.tsx` | Root component — router setup, session initialization, polling |
+| `src/hooks/useNotifications.tsx` | SSE hook — connects to notification stream, handles real-time order updates |
+| `src/components/NotificationBell.tsx` | Admin notification dropdown — shows recent orders with unread badge |
+| `src/components/FloatingCartButton.tsx` | Customer floating cart button — shows item count and total |
+| `src/components/LoginPrompt.tsx` | Guest login dialog — allows quick sign-in from product/cart pages |
+| `src/App.tsx` | Root component — router setup, session initialization, SSE polling |
 | `src/pages/admin/Dashboard.tsx` | Analytics dashboard with charts, filters, and KPIs |
 
 ---
